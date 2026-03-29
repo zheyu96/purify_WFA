@@ -214,7 +214,7 @@ int main(){
     vector<string> X_names = { "request_cnt", "time_limit", "tao",  "fidelity_threshold" , "avg_memory","hop_count" };
     //vector<string> X_names = {"Zmin","bucket_eps","time_eta"};
     vector<string> Y_names = {"fidelity_gain", "succ_request_cnt"};
-    vector<string> algo_names = {"ZFA_UB","ZFA2","ZFA","MyAlgo1", "MyAlgo2", "MyAlgo3", "Merge", "Linear", "ASAP"};
+    vector<string> algo_names = {"ZFA2","ZFA","MyAlgo1", "MyAlgo2", "MyAlgo3"};
     // init result
 
 
@@ -354,7 +354,7 @@ int main(){
                     cerr << "Avg path length = " << path_len / (double)path_cnt << "\n";
                     cerr << "Max path length = " << mx_path_len << "\n";
                     vector<AlgorithmBase*> algorithms;
-                    algorithms.emplace_back(new WernerAlgo_UB(graph,requests,paths));
+                    //algorithms.emplace_back(new WernerAlgo_UB(graph,requests,paths));
                     algorithms.emplace_back(new WernerAlgo2(graph,requests,paths));
                     algorithms.emplace_back(new WernerAlgo(graph,requests,paths));
                     if(X_name!="Zmin"&&X_name!="bucket_eps"&&X_name!="time_eta"){
