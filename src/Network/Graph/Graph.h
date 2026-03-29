@@ -79,6 +79,7 @@ public:
     void reserve_path(Path path, int amount);
     int distance(int src, int dst);
     double get_ini_fid(int u,int v);
+    void reserve_node_memory_at(int node_id, int t, int amount);
     void increase_resources(int multi);
     vector<vector<int>> adj_list;
     vector<set<int>> adj_set;

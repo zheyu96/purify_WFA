@@ -512,6 +512,11 @@ bool Graph::check_path_resource(Path path, int amount) {
 }
 
 
+void Graph::reserve_node_memory_at(int node_id, int t, int amount) {
+    nodes[node_id].reserve_memory(t, amount);
+    usage += amount;
+}
+
 void Graph::increase_resources(int multi) {
     for(int i = 0; i < num_nodes; i++) {
         int node_memory = nodes[i].get_memory();

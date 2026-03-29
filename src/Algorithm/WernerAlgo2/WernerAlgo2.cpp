@@ -235,13 +235,9 @@ Shape_vector WernerAlgo2::backtrack_shape(ZLabel leaf,const vector<int>& path, v
         Shape_vector result;
         if (leaf.ent_time.size() < 2) return Shape_vector{};
         assert(leaf.ent_time.size() == 2);
-        for(int i=0;i<leaf.purify_type+1;i++){
-            int start_time=leaf.ent_time[0]+i,end_time=leaf.ent_time[0]+i;
-            for(int j=0;j<Purify_in_vt[leaf.purify_type][i];j++){
-                result.push_back({left_id,{{start_time,end_time}}});
-                result.push_back({right_id,{{start_time,end_time}}});
-            }
-        }
+        // 標準區間格式：[ent_time[0], ent_time[1]]（跟原版 WernerAlgo 一致）
+        result.push_back({left_id,  {{leaf.ent_time[0], leaf.ent_time[1]}}});
+        result.push_back({right_id, {{leaf.ent_time[0], leaf.ent_time[1]}}});
         // LEAF: 一條 link，purify rounds = purify_type (即 tlen-1)
         out_purify_rounds = { leaf.purify_type };
         return result;
@@ -431,10 +427,68 @@ void WernerAlgo2::run() {
 
             if(request_index == -1 || used[request_index]) continue;
             
-            // 呼叫 check_resource 時開啟純化 (Enable Purification)
+            // 檢查資源：先用標準 check_resource 檢查 fidelity 和基本 memory，
+            // 再額外檢查 purification 的真實 memory 需求
+            bool resource_ok = false;
             if(graph.check_resource(shape, true, true)) {
+                resource_ok = true;
+                // 計算含 purification 的每 (node, timeslot) 總 memory 需求
+                Shape_vector sv_chk = shape.get_node_mem_range();
+                vector<int> pr_chk = shape.get_link_purify_rounds();
+                map<pair<int,int>, int> total_need; // (node, t) -> total amount
+
+                // 基本需求（跟 check_resource 一樣）
+                for(size_t i = 0; i < sv_chk.size(); ++i) {
+                    int node = sv_chk[i].first;
+                    for(auto& rng : sv_chk[i].second) {
+                        for(int t = rng.first; t <= rng.second; ++t)
+                            total_need[{node, t}]++;
+                    }
+                }
+                // purification 額外需求
+                for(size_t li = 0; li < sv_chk.size() - 1; ++li) {
+                    int rounds = (li < pr_chk.size()) ? pr_chk[li] : 0;
+                    if(rounds <= 0) continue;
+                    int link_start = sv_chk[li].second.back().first;
+                    int u = sv_chk[li].first, v = sv_chk[li+1].first;
+                    for(int ti = 0; ti <= rounds; ++ti) {
+                        int extra = (int)Purify_in_vt[rounds][ti] - 1;
+                        if(extra <= 0) continue;
+                        int t = link_start + ti;
+                        if(t >= graph.get_time_limit()) { resource_ok = false; break; }
+                        total_need[{u, t}] += extra;
+                        total_need[{v, t}] += extra;
+                    }
+                    if(!resource_ok) break;
+                }
+                // 檢查所有 (node, t) 是否有足夠 memory
+                for(auto& [nt, amount] : total_need) {
+                    if(!resource_ok) break;
+                    if(graph.get_node_memory_at(nt.first, nt.second) < amount)
+                        resource_ok = false;
+                }
+            }
+            if(resource_ok) {
                 used[request_index] = true;
                 graph.reserve_shape(shape, true);
+                // 額外扣除 purification 多消耗的 memory（標準 Shape 已扣 1，這裡補扣剩餘）
+                {
+                    Shape_vector sv_res = shape.get_node_mem_range();
+                    vector<int> pr_res = shape.get_link_purify_rounds();
+                    for(size_t li = 0; li < sv_res.size() - 1; ++li) {
+                        int rounds = (li < pr_res.size()) ? pr_res[li] : 0;
+                        if(rounds <= 0) continue;
+                        int link_start = sv_res[li].second.back().first;
+                        int u = sv_res[li].first, v = sv_res[li+1].first;
+                        for(int ti = 0; ti <= rounds; ++ti) {
+                            int extra = (int)Purify_in_vt[rounds][ti] - 1;
+                            if(extra <= 0) continue;
+                            int t = link_start + ti;
+                            graph.reserve_node_memory_at(u, t, extra);
+                            graph.reserve_node_memory_at(v, t, extra);
+                        }
+                    }
+                }
                 finished.push_back(request_index);
 
                 // [新增] 收集純化資訊
