@@ -75,7 +75,17 @@ Shape_vector WernerAlgo2::separation_oracle(){
         }
     }
     if(!todo_shape.empty()){
-        shape_purify_map[todo_shape]=best_purify_rounds;
+        // 只在尚無紀錄或新的有 purification 時才更新，避免 CONT 路徑覆寫掉 purified 版本
+        auto it = shape_purify_map.find(todo_shape);
+        if(it == shape_purify_map.end()){
+            shape_purify_map[todo_shape] = best_purify_rounds;
+        } else {
+            bool new_has = false, old_has = false;
+            for(int r : best_purify_rounds) if(r > 0) new_has = true;
+            for(int r : it->second) if(r > 0) old_has = true;
+            if(new_has && !old_has)
+                it->second = best_purify_rounds;
+        }
     }
     return todo_shape;
 }
