@@ -157,6 +157,16 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
                             double Bp=left_seg.B+right_seg.B+beta[s][t]+beta[e][t];
                             ZLabel L(Bp,Zp,Pp,Op::MERGE,-1,a,b,t,k,-1,lid,rid);
                             cand.push_back(L);
+                            // debug: 只印第一次 merge 的 Z 細節
+                            static bool merge_printed = false;
+                            if(!merge_printed) {
+                                cerr << "[ZFA2:merge] PASS Zp=" << (double)Zp << " Zhat=" << (double)dpp.Zhat
+                                     << " leftZ=" << (double)left_seg.Z << " rightZ=" << (double)right_seg.Z
+                                     << " leftOp=" << (int)left_seg.op << " rightOp=" << (int)right_seg.op
+                                     << " leftPurify=" << left_seg.purify_type << " rightPurify=" << right_seg.purify_type
+                                     << " t=" << t << endl;
+                                merge_printed = true;
+                            }
                         }
                     }
             }
