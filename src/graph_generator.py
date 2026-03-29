@@ -69,7 +69,7 @@ print("num_of_node =", num_of_node, file=sys.stderr)
 # print("min_memory_cnt =", min_memory_cnt, ", max_memory_cnt =", max_memory_cnt, file=sys.stderr)
 
 while True:
-    G = nx.waxman_graph(num_of_node, beta=0.85, alpha=0.03, domain=(0, 0, 0.5, 1))
+    G = nx.waxman_graph(num_of_node, beta=0.85, alpha=0.08, domain=(0, 0, 0.5, 1))
     # G = nx.waxman_graph(num_of_node, beta=0.85, alpha=10, domain=(0, 0, 0.5, 1))
     positions = nx.get_node_attributes(G, 'pos')
     add_edge = []

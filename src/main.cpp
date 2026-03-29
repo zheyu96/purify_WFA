@@ -136,8 +136,8 @@ int main(){
     default_setting["avg_memory"] = 10; // 16
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
-    default_setting["min_fidelity"] = 0.7;
-    default_setting["max_fidelity"] = 0.82;
+    default_setting["min_fidelity"] = 0.78;
+    default_setting["max_fidelity"] = 0.78;
     default_setting["swap_prob"] = 0.9;
     default_setting["fidelity_threshold"] = 0.7;
     default_setting["entangle_time"] = 0.00025;
