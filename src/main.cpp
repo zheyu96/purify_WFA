@@ -268,7 +268,7 @@ int main(){
                 // }
 
                 int sum_has_path = 0;
-                #pragma omp parallel for
+                //#pragma omp parallel for
                 for(int r = 0; r < round; r++) {
                     string filename = file_path + "input/round_" + to_string(r) + ".input";
                     ofstream ofs;
@@ -367,7 +367,7 @@ int main(){
                     }
 
 
-                    #pragma omp parallel for
+                    //#pragma omp parallel for
                     for(int i = 0; i < (int)algorithms.size(); i++) {
                         algorithms[i]->run();
                     }
