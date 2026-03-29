@@ -9,8 +9,8 @@ int rnd(int lower_bound, int upper_bound) {
     return unif(generator) % (upper_bound - lower_bound + 1) + lower_bound;
 }
 
-Graph::Graph(string filename, int _time_limit, double _swap_prob, int avg_memory, double min_fidelity, double max_fidelity, double _fidelity_threshold, double _A, double _B, double _n, double _T, double _tao,double _Zmin,double _bucket_eps,double _time_eta):
-    time_limit(_time_limit), fidelity_threshold(_fidelity_threshold), A(_A), B(_B), n(_n), T(_T), tao(_tao),Zmin(_Zmin),bucket_eps(_bucket_eps),time_eta(_time_eta), fidelity_gain(0), usage(0), succ_request_cnt(0) {
+Graph::Graph(string filename, int _time_limit, double _swap_prob, int avg_memory, double min_fidelity, double max_fidelity, double _fidelity_threshold, double _A, double _B, double _n, double _T, double _tao,double _Zmin,double _bucket_eps,double _time_eta,double _delta_P):
+    time_limit(_time_limit), fidelity_threshold(_fidelity_threshold), A(_A), B(_B), n(_n), T(_T), tao(_tao),Zmin(_Zmin),bucket_eps(_bucket_eps),time_eta(_time_eta),delta_P(_delta_P), fidelity_gain(0), usage(0), succ_request_cnt(0) {
     // geneator an adj list
 
     ifstream graph_file(filename);
