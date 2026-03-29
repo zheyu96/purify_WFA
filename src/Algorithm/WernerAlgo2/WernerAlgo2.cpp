@@ -76,6 +76,13 @@ Shape_vector WernerAlgo2::separation_oracle(){
     }
     if(!todo_shape.empty()){
         shape_purify_map[todo_shape]=best_purify_rounds;
+        // debug: 印出 oracle 選到的 purify rounds
+        bool has_purify = false;
+        for(int r : best_purify_rounds) if(r > 0) has_purify = true;
+        if(has_purify) cerr << "[ZFA2:oracle] selected shape with purify_rounds:";
+        else cerr << "[ZFA2:oracle] selected shape WITHOUT purification, rounds:";
+        for(int r : best_purify_rounds) cerr << " " << r;
+        cerr << endl;
     }
     return todo_shape;
 }
@@ -115,6 +122,9 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
                     if(L.Z<=dpp.Zhat){
                         L.ent_time={t-i-1,t};
                         cand.push_back(L);
+                        if(i>0) cerr << "[ZFA2:dp] purified leaf added! t=" << t << " a=" << a << " b=" << b << " purify_type=" << i << " Z=" << (double)L.Z << " Zhat=" << (double)dpp.Zhat << endl;
+                    } else {
+                        if(i>0) cerr << "[ZFA2:dp] purified leaf REJECTED t=" << t << " tlen=" << i+1 << " Z=" << (double)L.Z << " Zhat=" << (double)dpp.Zhat << endl;
                     }
                 }
             }
