@@ -41,19 +41,21 @@ private:
         public:
         double B= 1000.0;
         double Z = 1000.0;   // 成本 / 目標
+        double P=1.0;
+        int purify_type=-1;
         int a = -1, b = -1, t = -1, k = -1; // 狀態索引與輔助
         int left_id=-1,right_id=-1,parent_id=-1;//左邊第幾個cand和右邊第幾個cand,祖先是第幾個cand
         Op op = Op::LEAF;
         vector<int> ent_time;
         // 回溯
         ZLabel(){}
-        ZLabel(double _B, double _Z, Op _op, int _a, int _b, int _t, int _k, int pid = -1, int lid = -1, int rid = -1)
-        : B(_B), Z(_Z), op(_op), a(_a), b(_b), t(_t), k(_k), parent_id(pid), left_id(lid), right_id(rid) {}
+        ZLabel(double _B, double _Z, double _P, Op _op,int _purify_type, int _a, int _b, int _t, int _k, int pid = -1, int lid = -1, int rid = -1)
+        : B(_B), Z(_Z), P(_P), op(_op),purify_type(_purify_type), a(_a), b(_b), t(_t), k(_k), parent_id(pid), left_id(lid), right_id(rid) {}
         // Assignment operator (optional, default is sufficient unless custom logic is needed)
     };
 
     struct DPParam{
-        double eps_bucket,Zhat,Zmin,eta,T;
+        double eps_bucket,Zhat,Zmin,eta,T,deltaP;
         int tau_max;
     }dpp;
     // ===== 參數 / 對偶變數（風格比照 MyAlgo1） =====
@@ -74,14 +76,22 @@ private:
 
     // ===== 基本操作（Pareto / 分桶 / 存儲 / 回溯 / 評分） =====
     void pareto_prune_byZ(vector<ZLabel>& cand);
-    void bucket_by_Z(vector<ZLabel>& cand);
+    void bucket_by_ZP(vector<ZLabel>& cand);
 
-    Shape_vector backtrack_shape(ZLabel leaf, const vector<int>& path);
+    Shape_vector backtrack_shape(ZLabel leaf, const vector<int>& path, vector<int>& out_purify_rounds);
     int split_dis(int s,int d,WernerAlgo2::ZLabel& L);
     pair<double,WernerAlgo2::ZLabel> eval_best_J(int s, int d, int t, double alp);
+    int purify_time=3;
+    double Purify_in_vt[4][5]={
+        {1,1},
+        {1,2,2},
+        {1,2,3,2},
+        {1,2,3,3,2},
+    };
 
-private:
-    // 你可在此添加暫存/緩衝成員
+    ZLabel gen_leaf_label(int s,int e,int t,int tlen);
+    // 暫存最近一次 oracle 回傳 shape 對應的 purify rounds
+    map<Shape_vector, vector<int>> shape_purify_map;
 };
 
 #endif // __WERNER_ALGO2_H

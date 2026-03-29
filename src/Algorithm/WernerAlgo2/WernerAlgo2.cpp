@@ -31,6 +31,7 @@ void WernerAlgo2::variable_initialize() {
     dpp.T    = time_limit-1;
     dpp.tau_max=min(time_limit-1,5);
     dpp.eta  = graph.get_tao()/graph.get_time_limit();
+    dpp.deltaP=graph.get_delta_P();
     beta.assign(V, vector<double>(T, INF));
 
     for (int v = 0; v < V; ++v) {
@@ -46,6 +47,7 @@ Shape_vector WernerAlgo2::separation_oracle(){
     double most_violate=1e9;
     bool flag=0;
     Shape_vector todo_shape;
+    vector<int> best_purify_rounds;
     for(int i=0;i<requests.size();i++){
         int src=requests[i].first,dst=requests[i].second;
         vector<Path> paths=get_paths(src,dst);
@@ -63,16 +65,39 @@ Shape_vector WernerAlgo2::separation_oracle(){
             for(int t=1;t<=dpp.T;t++){
                 run_dp_in_t(paths[p],dpp,t);
                 auto cur_val=eval_best_J(0,paths[p].size()-1,t,alpha[i]);
-                if(cur_val.first/graph.path_Pr(paths[p])<most_violate){
-                    most_violate=cur_val.first/graph.path_Pr(paths[p]);
-                    todo_shape=backtrack_shape(cur_val.second,paths[p]);
+                if(cur_val.first<most_violate){
+                    most_violate=cur_val.first;
+                    vector<int> cur_rounds;
+                    todo_shape=backtrack_shape(cur_val.second,paths[p],cur_rounds);
+                    best_purify_rounds=cur_rounds;
                 }
             }
         }
     }
+    if(!todo_shape.empty()){
+        shape_purify_map[todo_shape]=best_purify_rounds;
+    }
     return todo_shape;
 }
-
+WernerAlgo2::ZLabel WernerAlgo2::gen_leaf_label(int s,int e,int st,int tlen) {
+    double Bleaf=0.0;
+    if(st-tlen<0) return ZLabel();
+    for(int i=0;i<=tlen;i++){
+        double bt=beta[s][st-i]+beta[e][st-i];
+        Bleaf+=bt*Purify_in_vt[tlen-1][i];
+    }
+    double w_ini=graph.get_link_werner(s,e);
+    double w_cur=w_ini,p_cur=graph.get_entangle_succ_prob(s,e);
+    for(int i=1;i<=tlen-1;i++){
+        p_cur*=(9.0L*w_cur*w_ini-3.0L*w_ini-3.0L*w_cur+5)/8.0L;
+        w_cur=(3*w_cur*w_ini+3*w_ini+3*w_cur-1.0L)/(9*w_cur*w_ini-3*w_ini-3*w_cur+5.0L);
+        p_cur*=graph.get_entangle_succ_prob(s,e);
+    }
+    double Zleaf=sqrt(-log(w_cur));
+    double Pleaf=log(p_cur);
+    if(Zleaf>dpp.Zhat) return ZLabel();
+    return ZLabel(Bleaf,Zleaf,Pleaf,Op::LEAF,tlen-1,s,e,st,-1);
+} 
 void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
     const int T = graph.get_time_limit();
     const int n = (int)path.size();
@@ -84,18 +109,11 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
             vector<ZLabel> cand;
             //leaf
             if(a+1==b){
-                for(int tlen=1;tlen<=dpp.tau_max;tlen++){
-                    if (t - tlen < 1) continue;
-                    double Bleaf=0.0;
-                    int st=t-tlen;
-                    if(st<1)continue;
-                    for(int tt=st;tt<=t;tt++)
-                        Bleaf+=beta[s][tt]+beta[e][tt];
-                    double Zcur=1.0L-(1.0L-graph.get_link_werner(s,e))/tlen;
-                    double Zleaf=sqrt(-log(Zcur));
-                    if(Zleaf<=dpp.Zhat){
-                        ZLabel L(Bleaf,Zleaf,Op::LEAF,a,b,t,-1);
-                        L.ent_time={t-tlen,t};
+                for(int i=0;i<=purify_time;i++){
+                    if(t-i-1<=0) continue;
+                    ZLabel L=gen_leaf_label(s,e,t,i+1);
+                    if(L.Z<=dpp.Zhat){
+                        L.ent_time={t-i-1,t};
                         cand.push_back(L);
                     }
                 }
@@ -106,7 +124,8 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
                 double Zp=pre[p_id].Z+dpp.eta;
                 if(Zp<=dpp.Zhat){
                     double Bp=pre[p_id].B+beta[s][t]+beta[e][t];
-                    ZLabel L(Bp,Zp,Op::CONT,a,b,t,-1,p_id);
+                    double Pp=pre[p_id].P;
+                    ZLabel L(Bp,Zp,Pp,Op::CONT,-1,a,b,t,-1,p_id);
                     cand.push_back(L);
                 }
             }
@@ -119,16 +138,27 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
                         auto left_seg=L1[lid],right_seg=L2[rid];
                         double Zp=sqrt((left_seg.Z+dpp.eta)*(left_seg.Z+dpp.eta)+
                                         (right_seg.Z+dpp.eta)*(right_seg.Z+dpp.eta));
+                        double swap_prob=log(graph.get_node_swap_prob(path[k]));
+                        double Pp=left_seg.P+right_seg.P+swap_prob;
                         if(Zp<=dpp.Zhat){
                             double Bp=left_seg.B+right_seg.B+beta[s][t]+beta[e][t];
-                            ZLabel L(Bp,Zp,Op::MERGE,a,b,t,k,-1,lid,rid);
+                            ZLabel L(Bp,Zp,Pp,Op::MERGE,-1,a,b,t,k,-1,lid,rid);
                             cand.push_back(L);
                         }
                     }
             }
-            bucket_by_Z(cand);
-            // Convert cand (vector<ZLabel>) to vector<shared_ptr<ZLabel>>
-            DP_table[t][a][b]=cand;
+            vector<ZLabel> non_leaf;
+            for (auto& L : cand) {
+                if (L.op != Op::LEAF)
+                    non_leaf.push_back(L);
+            }
+            bucket_by_ZP(non_leaf);// trimming non-leaf
+            cand.erase(
+                remove_if(cand.begin(), cand.end(),
+                        [](const ZLabel& L){ return L.op != Op::LEAF; }),
+                cand.end());
+            cand.insert(cand.end(), non_leaf.begin(), non_leaf.end());
+            DP_table[t][a][b] = cand;
         }
 }
 
@@ -149,51 +179,56 @@ void WernerAlgo2::pareto_prune_byZ(vector<ZLabel>& cand) {
     cand.swap(kept);
 }
 
-void WernerAlgo2::bucket_by_Z(vector<ZLabel>& cand) {
+void WernerAlgo2::bucket_by_ZP(vector<ZLabel>& cand) {
     if (cand.empty()) return;
     double q=1+dpp.eps_bucket;
     double invLogQ=1.0/log(q);
-    map<double,ZLabel> buckets;
+    double deltaP=dpp.deltaP;
+    map<pair<double,double>,ZLabel> buckets;
     for(auto L:cand){
-        double k;
-        if(L.Z<=dpp.Zmin) k=0.0;
+        double kW;
+        if(L.Z<=dpp.Zmin) kW=0.0;
         else{
-            k=floor(log(L.Z/dpp.Zmin)*invLogQ+1e-12);
-            if(k<0) k=0.0;
+            kW=floor(log(L.Z/dpp.Zmin)*invLogQ+1e-12);
+            if(kW<0) kW=0.0;
         } 
-        if(buckets.find(k)==buckets.end()||L.B+1e-12<buckets[k].B)
-            buckets[k]=L;
+        double kP=floor(-L.P/deltaP);
+        auto key=make_pair(kW,kP);
+        if(buckets.count(key)==0||L.B<buckets[key].B)
+            buckets[key]=L;
     }
     vector<ZLabel> bucketed;
     for(auto L:buckets)
         bucketed.push_back(L.second);
-    pareto_prune_byZ(bucketed);
+    //pareto_prune_byZ(bucketed);
     sort(bucketed.begin(), bucketed.end(), [](const ZLabel& x, const ZLabel& y){
         return x.Z < y.Z;
     });
     cand.swap(bucketed);
 }
 
-Shape_vector WernerAlgo2::backtrack_shape(ZLabel leaf,const vector<int>& path){
+Shape_vector WernerAlgo2::backtrack_shape(ZLabel leaf,const vector<int>& path, vector<int>& out_purify_rounds){
     int left_id=path[leaf.a],right_id=path[leaf.b];
     if(leaf.op==Op::LEAF){
         Shape_vector result;
-        if (leaf.ent_time.size() < 2) return Shape_vector{}; 
+        if (leaf.ent_time.size() < 2) return Shape_vector{};
         assert(leaf.ent_time.size() == 2);
-        // 這邊的 fidelity 計算僅為 backtrack 過程中的檢查，與主要統計邏輯分開
-        double fid=graph.get_F_init(left_id,right_id);
-        double w=graph.get_link_werner(left_id,right_id);
-        double new_w=1.0L-(1.0L-graph.get_link_werner(left_id,right_id))/(leaf.ent_time[1]-leaf.ent_time[0]);
-        double new_fid= (3.0*new_w +1.0)/4.0;
-        
-        result.push_back({left_id,{{leaf.ent_time[0],leaf.ent_time[1]}}});
-        result.push_back({right_id,{{leaf.ent_time[0],leaf.ent_time[1]}}});
+        for(int i=0;i<leaf.purify_type+1;i++){
+            int start_time=leaf.ent_time[0]+i,end_time=leaf.ent_time[0]+i;
+            for(int j=0;j<Purify_in_vt[leaf.purify_type][i];j++){
+                result.push_back({left_id,{{start_time,end_time}}});
+                result.push_back({right_id,{{start_time,end_time}}});
+            }
+        }
+        // LEAF: 一條 link，purify rounds = purify_type (即 tlen-1)
+        out_purify_rounds = { leaf.purify_type };
         return result;
     }
     if(leaf.op==Op::CONT){
         assert(leaf.parent_id>=0&&leaf.parent_id<DP_table[leaf.t-1][leaf.a][leaf.b].size());
         ZLabel pre_label=DP_table[leaf.t-1][leaf.a][leaf.b][leaf.parent_id];
-        Shape_vector last_time=backtrack_shape(pre_label,path);
+        // CONT: idle 不改變 purify rounds，直接透傳
+        Shape_vector last_time=backtrack_shape(pre_label,path,out_purify_rounds);
         if (last_time.empty()) return Shape_vector{};
         auto & prel=last_time.front().second[0],&prer=last_time.back().second[0];
         assert(last_time.front().first==path[leaf.a]);
@@ -208,10 +243,12 @@ Shape_vector WernerAlgo2::backtrack_shape(ZLabel leaf,const vector<int>& path){
         Shape_vector left_result,right_result,result;
         assert(leaf.k>=0);
         int k_id=path[leaf.k];
+        // MERGE: 左右各自遞迴取 purify rounds，再串接
+        vector<int> left_rounds, right_rounds;
         ZLabel left_leaf=DP_table[leaf.t-1][leaf.a][leaf.k][leaf.left_id];
-        left_result=backtrack_shape(left_leaf,path);
+        left_result=backtrack_shape(left_leaf,path,left_rounds);
         ZLabel right_leaf=DP_table[leaf.t-1][leaf.k][leaf.b][leaf.right_id];
-        right_result=backtrack_shape(right_leaf,path);
+        right_result=backtrack_shape(right_leaf,path,right_rounds);
         if(DEBUG) {
             assert(left_result.front().first == path[leaf.a]);
             assert(left_result.front().second[0].second == leaf.t - 1);
@@ -233,11 +270,13 @@ Shape_vector WernerAlgo2::backtrack_shape(ZLabel leaf,const vector<int>& path){
 
         result.front().second[0].second++;
         result.back().second[0].second++;
+        // 串接左右的 purify rounds
+        out_purify_rounds = left_rounds;
+        out_purify_rounds.insert(out_purify_rounds.end(), right_rounds.begin(), right_rounds.end());
         return result;
     }
+    out_purify_rounds.clear();
     return Shape_vector{};
-    // Handle unexpected Op value
-    cerr << "[WernerAlgo::backtrack_shape] Warning: Unknown Op value encountered." << std::endl;
 }
 int WernerAlgo2::split_dis(int s,int d,WernerAlgo2::ZLabel& L){
     if(L.op!=WernerAlgo2::Op::MERGE||L.k<0) return 1e18/4;
@@ -250,7 +289,7 @@ pair<double,WernerAlgo2::ZLabel> WernerAlgo2::eval_best_J(int s, int d, int t, d
     int flag=0;
     ZLabel tmp={};
     for(auto L:DP_table[t][s][d]){
-        double J=(alp+L.B)*exp(L.Z*L.Z);
+        double J=(alp+L.B)*exp(L.Z*L.Z-L.P);
         int dis=split_dis(s,d,L);
         if(J+EPS<bestJ||(fabs(J-bestJ)<=EPS&&dis<bestdis)){
             bestJ=J;
@@ -345,7 +384,11 @@ void WernerAlgo2::run() {
         map<int, vector<pair<double, double>>> purification_stats;
 
         for(pair<double, Shape_vector> P : shapes) {
-            Shape shape = Shape(P.second);
+            // 用 purify_rounds 構造 Shape（若有的話）
+            vector<int> pr;
+            if(shape_purify_map.count(P.second))
+                pr = shape_purify_map[P.second];
+            Shape shape = pr.empty() ? Shape(P.second) : Shape(P.second, pr);
             int request_index = -1;
             for(int i = 0; i < (int)requests.size(); i++) {
                 if(used[i] == false && requests[i] == make_pair(shape.get_node_mem_range().front().first, shape.get_node_mem_range().back().first)) {
@@ -363,21 +406,21 @@ void WernerAlgo2::run() {
 
                 // [新增] 收集純化資訊
                 Shape_vector sv = shape.get_node_mem_range();
-                // 遍歷每一段 Link (從 node i 到 node i+1)
+                vector<int> pur_rounds = shape.get_link_purify_rounds();
+                // 遍歷每一段 Link
                 for(size_t i = 0; i < sv.size() - 1; ++i) {
-                    int u = sv[i].first;
-                    int v = sv[i+1].first;
-
-                    // Leaf node 的 memory range 最後一個區間代表與下一個節點的 Entanglement
-                    int start = sv[i].second.back().first;
-                    int end = sv[i].second.back().second;
-                    int duration = end - start;
-
-                    // 只有當 duration > 1 代表有進行純化操作
-                    if (duration > 1) {
-                        double w_raw = graph.get_link_werner(u, v);
-                        double w_new = 1.0 - (1.0 - w_raw) / (double)duration;
-                        purification_stats[duration].push_back({w_raw, w_new});
+                    int rounds = (i < pur_rounds.size()) ? pur_rounds[i] : 0;
+                    if (rounds > 0) {
+                        int u = sv[i].first;
+                        int v = sv[i+1].first;
+                        double w_e = graph.get_link_werner(u, v);
+                        double w_cur = w_e;
+                        for (int r = 0; r < rounds; r++) {
+                            double num = 3.0L * w_cur * w_e + 3.0L * w_cur + 3.0L * w_e - 1.0L;
+                            double den = 9.0L * w_cur * w_e - 3.0L * w_cur - 3.0L * w_e + 5.0L;
+                            w_cur = num / den;
+                        }
+                        purification_stats[rounds].push_back({w_e, w_cur});
                     }
                 }
             }
@@ -398,7 +441,7 @@ void WernerAlgo2::run() {
             if (!purification_stats.empty()) {
                 log_file << "--- Round Log ---" << endl;
                 for(auto const& [len, vec] : purification_stats) {
-                    log_file << "Duration " << len << " (Count: " << vec.size() << "):" << endl;
+                    log_file << "Rounds " << len << " (Count: " << vec.size() << "):" << endl;
                     for(auto const& pair : vec) {
                         double w_raw = pair.first;
                         double w_new = pair.second;
@@ -420,10 +463,10 @@ void WernerAlgo2::run() {
         // 同時印到 cerr 方便即時觀察
         cerr << "\n=== [WernerAlgo2 Purification Stats] ===" << endl;
         if (purification_stats.empty()) {
-            cerr << "No links were purified (all duration = 1)." << endl;
+            cerr << "No links were purified (all rounds = 0)." << endl;
         } else {
             for(auto const& [len, vec] : purification_stats) {
-                cerr << "Duration " << len << " (Count: " << vec.size() << "):" << endl;
+                cerr << "Rounds " << len << " (Count: " << vec.size() << "):" << endl;
                 // 為了避免洗版，終端機只印數量，詳細內容看檔案
             }
         }

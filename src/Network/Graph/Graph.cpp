@@ -186,7 +186,9 @@ double Graph::get_ini_fid(int src,int dst){
     }
     return f[dst];
 }
-
+double Graph::get_delta_P(){
+    return delta_P;    
+}
 // [修改] 增加 enable_purification 參數
 bool Graph::check_resource(Shape shape, bool threshold /*= true*/, bool enable_purification /*= false*/) {
     Shape_vector nm = shape.get_node_mem_range();

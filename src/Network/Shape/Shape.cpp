@@ -9,10 +9,17 @@ using namespace std;
 Shape::Shape(Shape_vector _node_mem_range):
     node_mem_range(_node_mem_range) {}
 
+Shape::Shape(Shape_vector _node_mem_range, vector<int> _link_purify_rounds):
+    node_mem_range(_node_mem_range), link_purify_rounds(_link_purify_rounds) {}
+
 Shape::Shape() {}
 
 Shape_vector Shape::get_node_mem_range() {
     return node_mem_range;
+}
+
+vector<int> Shape::get_link_purify_rounds() {
+    return link_purify_rounds;
 }
 
 // [修改 1] 函式定義必須包含 bool enable_purification (注意：這裡不寫預設值 = false，預設值只寫在 .h)
@@ -31,35 +38,32 @@ double Shape::get_fidelity(double _A, double _B, double _n, double _T, double _t
 double Shape::recursion_get_fidelity(int left, int right, map<pair<int, int> , double> &F_init) {
     // Base Case: 葉節點 (Link)
     if(left == right - 1) {
-        // 1. 取得該 Link 的原始物理 Fidelity
         double raw_f = F_init[{node_mem_range[left].first, node_mem_range[right].first}];
-        
-        // 2. 計算該 Link 的持續時間 (Duration)
-        int start_time = node_mem_range[left].second.back().first;
-        int end_time = node_mem_range[left].second.back().second;
-        int duration = end_time - start_time;
 
-        // [修改 3] 關鍵：只有當 "開關開啟 (purification_enabled)" 且 "時間長度 > 1" 時，才執行純化
-        if (this->purification_enabled && duration > 1) {
-            // (1) Fidelity -> Werner Parameter (W)
-            // 公式: F = (3W + 1) / 4  =>  W = (4F - 1) / 3
-            double W_raw = (4.0 * raw_f - 1.0) / 3.0;
+        // 若有提供 link_purify_rounds 且該 link 有 purification，使用正確輪數 (論文 Eq.7-8)
+        int rounds = 0;
+        if (this->purification_enabled && left < (int)link_purify_rounds.size()) {
+            rounds = link_purify_rounds[left];
+        }
 
-            // (2) 執行純化公式 (對應 WernerAlgo2 的 Zcur 計算)
-            // 公式: W_new = 1 - (1 - W_raw) / duration
-            double W_new = 1.0 - (1.0 - W_raw) / (double)duration;
-            cout<<"\033[1;32m"<< ">1 time slot (" << node_mem_range[left].first << ", " << node_mem_range[right].first << ")"
-                << " | Duration: " << duration 
-                << " | W_raw: " << W_raw 
-                << " | W_new: " << W_new << "\033[0m" << endl;
-            // (3) Werner Parameter (W) -> Fidelity
-            double purified_f = (3.0 * W_new + 1.0) / 4.0;
+        if (rounds > 0) {
+            // Fidelity -> Werner parameter: w = (4F - 1) / 3
+            double w_e = (4.0 * raw_f - 1.0) / 3.0;
+            double w_cur = w_e;
 
-            // 回傳經過純化並加上一次操作衰減 (pass_tao) 的值
+            // Pumping purification (Eq.7-8)
+            for (int r = 0; r < rounds; r++) {
+                double num = 3.0 * w_cur * w_e + 3.0 * w_cur + 3.0 * w_e - 1.0;
+                double den = 9.0 * w_cur * w_e - 3.0 * w_cur - 3.0 * w_e + 5.0;
+                w_cur = num / den;
+            }
+
+            // Werner parameter -> Fidelity: F = (3w + 1) / 4
+            double purified_f = (3.0 * w_cur + 1.0) / 4.0;
             return pass_tao(purified_f);
         }
 
-        // 如果 duration == 1 或者純化開關未開啟 (MyAlgo3)，直接回傳原始 Fidelity 並衰減
+        // 無 purification，直接回傳原始 Fidelity 並衰減
         return pass_tao(raw_f);
     }
 

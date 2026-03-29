@@ -17,9 +17,12 @@ class Shape {
 private:
     Shape_vector node_mem_range;
     double A, B, n, T, tao;
-    
+
     // [新增] 必須要在這裡宣告這個變數，Shape.cpp 才能使用它
     bool purification_enabled = false;
+
+    // 每條 link 的 purification 輪數（大小 = node數-1），空代表不啟用
+    vector<int> link_purify_rounds;
 
     double recursion_get_fidelity(int left, int right, map<pair<int, int> , double> &F_init);
     // void check_valid(); // <--- 原本在這裡 (private)，導致錯誤
@@ -34,9 +37,11 @@ private:
 
 public:
     Shape(Shape_vector _node_mem_range);
+    Shape(Shape_vector _node_mem_range, vector<int> _link_purify_rounds);
     Shape();
 
     Shape_vector get_node_mem_range();
+    vector<int> get_link_purify_rounds();
 
     // [修改] 這裡的宣告必須包含新的參數 bool enable_purification
     double get_fidelity(double _A, double _B, double _n, double _T, double _tao, 

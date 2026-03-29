@@ -146,6 +146,7 @@ int main(){
     default_setting["bucket_eps"]=0.01;
     default_setting["time_eta"]=0.001;
     default_setting["hop_count"]=3;
+    default_setting["delta_P"]=0.01;
     map<string, vector<double>> change_parameter;
     change_parameter["request_cnt"] = {10,30,50,70,90};
     change_parameter["num_nodes"] = {40, 70, 100, 130, 160};
@@ -164,7 +165,7 @@ int main(){
     //change_parameter["Zmin"]={0.028,0.150,0.272,0.394,0.518};
     change_parameter["bucket_eps"]={0.00001,0.0001,0.001,0.01,0.1};
     change_parameter["time_eta"]={0.00001,0.0001,0.001,0.01,0.1};
-    int round = 50;
+    int round = 10;
     vector<vector<SDpair>> default_requests(round);
     #pragma omp parallel for
     for(int r = 0; r < round; r++) {
@@ -196,7 +197,7 @@ int main(){
             cerr<<"error:\tsystem proccess python error"<<endl;
             exit(1);
         }
-        Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta);
+        Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
         //default_requests[r] = generate_requests(graph, 190, length_lower, length_upper);
         default_requests[r]=generate_requests_fid(graph,250,0.6,2);
         //cerr<<"Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;

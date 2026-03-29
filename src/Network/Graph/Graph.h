@@ -22,6 +22,7 @@ class Graph {
     double avg_entangle_prob;
     int usage;
     double succ_request_cnt;
+    double delta_P;
     vector<Node> nodes;
 
     vector<double> boundary, cnt;
@@ -30,7 +31,7 @@ class Graph {
     string file_name;
     Path get_path(int from, int to);
 public:
-    Graph(string filename, int _time_limit, double _swap_prob, int avg_memory, double min_fidelity, double max_fidelity, double _fidelity_threshold, double _A, double _B, double _n, double _T, double _tao,double _Zmin,double _bucket_eps,double _time_eta);
+    Graph(string filename, int _time_limit, double _swap_prob, int avg_memory, double min_fidelity, double max_fidelity, double _fidelity_threshold, double _A, double _B, double _n, double _T, double _tao,double _Zmin,double _bucket_eps,double _time_etaㄝ);
     Graph() {}
     ~Graph();
     int get_node_memory_at(int node_id, int t);
@@ -54,6 +55,7 @@ public:
     double get_fidelity_threshold();
     double get_pure_fidelity();
     double get_F_init(int u, int v);
+    double get_delta_P();
     map<pair<int, int>, double> get_F_init();
 
     double get_link_werner(int u,int v);
