@@ -48,16 +48,13 @@ Shape_vector WernerAlgo2::separation_oracle(){
     bool flag=0;
     Shape_vector todo_shape;
     vector<int> best_purify_rounds;
-    cerr << "[ZFA2:oracle] requests.size()=" << requests.size() << endl;
     for(int i=0;i<requests.size();i++){
         int src=requests[i].first,dst=requests[i].second;
         vector<Path> paths=get_paths(src,dst);
-        cerr << "[ZFA2:oracle] req " << i << " (" << src << "->" << dst << ") paths=" << paths.size() << endl;
         for(int p=0;p<paths.size();p++){
             // Example initialization: adjust T and n as needed for your context
             int T=dpp.T+5;
             int n=paths[p].size()+5;
-            cerr << "[ZFA2:oracle] path " << p << " len=" << paths[p].size() << " DP_table T=" << T << " n=" << n << endl;
             DP_table.clear();
             DP_table.resize(T);
             for(int i=0;i<DP_table.size();i++){
@@ -66,14 +63,11 @@ Shape_vector WernerAlgo2::separation_oracle(){
                     DP_table[i][j].resize(n);
             }
             for(int t=1;t<=dpp.T;t++){
-                cerr << "[ZFA2:oracle] run_dp_in_t t=" << t << "/" << (int)dpp.T << endl;
                 run_dp_in_t(paths[p],dpp,t);
-                cerr << "[ZFA2:oracle] eval_best_J t=" << t << endl;
                 auto cur_val=eval_best_J(0,paths[p].size()-1,t,alpha[i]);
                 if(cur_val.first<most_violate){
                     most_violate=cur_val.first;
                     vector<int> cur_rounds;
-                    cerr << "[ZFA2:oracle] backtrack_shape t=" << t << endl;
                     todo_shape=backtrack_shape(cur_val.second,paths[p],cur_rounds);
                     best_purify_rounds=cur_rounds;
                 }
@@ -88,16 +82,7 @@ Shape_vector WernerAlgo2::separation_oracle(){
 WernerAlgo2::ZLabel WernerAlgo2::gen_leaf_label(int s,int e,int st,int tlen,int path_a,int path_b) {
     double Bleaf=0.0;
     if(st-tlen<0) return ZLabel();
-    // bounds check
-    if(s >= (int)beta.size() || e >= (int)beta.size()) {
-        cerr << "[ZFA2:leaf] ERROR s=" << s << " or e=" << e << " >= beta.size()=" << beta.size() << endl;
-        return ZLabel();
-    }
     for(int i=0;i<=tlen;i++){
-        if(st-i < 0 || st-i >= (int)beta[s].size()) {
-            cerr << "[ZFA2:leaf] ERROR st-i=" << st-i << " out of beta[s].size()=" << beta[s].size() << endl;
-            return ZLabel();
-        }
         double bt=beta[s][st-i]+beta[e][st-i];
         Bleaf+=bt*Purify_in_vt[tlen-1][i];
     }
@@ -116,17 +101,10 @@ WernerAlgo2::ZLabel WernerAlgo2::gen_leaf_label(int s,int e,int st,int tlen,int 
 void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
     const int T = graph.get_time_limit();
     const int n = (int)path.size();
-    cerr << "[ZFA2:dp] run_dp_in_t t=" << t << " T=" << T << " n=" << n
-         << " DP_table.size()=" << DP_table.size() << endl;
-    if(t >= (int)DP_table.size()) { cerr << "[ZFA2:dp] ERROR t >= DP_table.size()" << endl; return; }
 
     // -------- t = 1..T-1 外圈時間迴圈 --------
     for(int a=0;a<n-1;a++)
         for(int b=a+1;b<n;b++){
-            if(a >= (int)DP_table[t].size() || b >= (int)DP_table[t][a].size()) {
-                cerr << "[ZFA2:dp] ERROR a=" << a << " b=" << b << " out of bounds" << endl;
-                continue;
-            }
             int s=path[a],e=path[b];
             vector<ZLabel> cand;
             //leaf
@@ -321,27 +299,17 @@ pair<double,WernerAlgo2::ZLabel> WernerAlgo2::eval_best_J(int s, int d, int t, d
 }
 
 void WernerAlgo2::run() {
-    cerr << "[ZFA2] run() start, requests.size()=" << requests.size() << endl;
     int round = 1;
     while (round-- && !requests.empty()) {
         variable_initialize();
-        cerr << "[ZFA2] variable_initialize done, dpp.T=" << dpp.T << " dpp.Zhat=" << dpp.Zhat << endl;
         //cerr << "\033[1;31m"<< "[WernerAlgo's parameter] : "<< dpp.Zmin<<" "<<dpp.eps_bucket<<" "<<dpp.eta<< "\033[0m"<< endl;
         int it=0;
         double eps=1e-4;
         while (obj+eps < 1.0) {
-            cerr << "[ZFA2] oracle iteration " << it++ << ", obj=" << (double)obj << endl;
             //if(++it>200) break;
             Shape_vector shape=separation_oracle();
-            cerr << "[ZFA2] oracle done, shape.size()=" << shape.size() << endl;
             if (shape.empty()) break;
             // 先用MyAlgo1的框架刻出來
-            cerr << "[ZFA2:run] shape details:" << endl;
-            for(int i=0;i<(int)shape.size();i++){
-                cerr << "  shape[" << i << "] node=" << shape[i].first << " intervals=" << shape[i].second.size() << ":";
-                for(auto& p : shape[i].second) cerr << " [" << p.first << "," << p.second << "]";
-                cerr << endl;
-            }
             double q = 1.0;
             for(int i=0;i<shape.size();i++){
                 map<int,int> need_amount;
@@ -353,7 +321,6 @@ void WernerAlgo2::run() {
                 for(pair<int,int>P:need_amount){
                     int t=P.first;
                     double theta=P.second;
-                    cerr << "[ZFA2:run] get_node_memory_at node=" << shape[i].first << " t=" << t << " V=" << graph.get_num_nodes() << " T=" << graph.get_time_limit() << endl;
                     q=min(q,graph.get_node_memory_at(shape[i].first,t)/theta);
                 }
             }
