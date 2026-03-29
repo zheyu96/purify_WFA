@@ -89,7 +89,7 @@ private:
         {1,2,3,3,2},
     };
 
-    ZLabel gen_leaf_label(int s,int e,int t,int tlen);
+    ZLabel gen_leaf_label(int s,int e,int st,int tlen,int path_a,int path_b);
     // 暫存最近一次 oracle 回傳 shape 對應的 purify rounds
     map<Shape_vector, vector<int>> shape_purify_map;
 };

@@ -85,7 +85,7 @@ Shape_vector WernerAlgo2::separation_oracle(){
     }
     return todo_shape;
 }
-WernerAlgo2::ZLabel WernerAlgo2::gen_leaf_label(int s,int e,int st,int tlen) {
+WernerAlgo2::ZLabel WernerAlgo2::gen_leaf_label(int s,int e,int st,int tlen,int path_a,int path_b) {
     double Bleaf=0.0;
     if(st-tlen<0) return ZLabel();
     // bounds check
@@ -111,7 +111,7 @@ WernerAlgo2::ZLabel WernerAlgo2::gen_leaf_label(int s,int e,int st,int tlen) {
     double Zleaf=sqrt(-log(w_cur));
     double Pleaf=log(p_cur);
     if(Zleaf>dpp.Zhat) return ZLabel();
-    return ZLabel(Bleaf,Zleaf,Pleaf,Op::LEAF,tlen-1,s,e,st,-1);
+    return ZLabel(Bleaf,Zleaf,Pleaf,Op::LEAF,tlen-1,path_a,path_b,st,-1);
 } 
 void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
     const int T = graph.get_time_limit();
@@ -133,7 +133,7 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
             if(a+1==b){
                 for(int i=0;i<=purify_time;i++){
                     if(t-i-1<=0) continue;
-                    ZLabel L=gen_leaf_label(s,e,t,i+1);
+                    ZLabel L=gen_leaf_label(s,e,t,i+1,a,b);
                     if(L.Z<=dpp.Zhat){
                         L.ent_time={t-i-1,t};
                         cand.push_back(L);
