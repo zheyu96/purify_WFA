@@ -369,7 +369,9 @@ int main(){
 
                     //#pragma omp parallel for
                     for(int i = 0; i < (int)algorithms.size(); i++) {
+                        cerr << "[DEBUG] Running algorithm " << i << ": " << algorithms[i]->get_name() << endl;
                         algorithms[i]->run();
+                        cerr << "[DEBUG] Finished algorithm " << i << ": " << algorithms[i]->get_name() << endl;
                     }
 
 
