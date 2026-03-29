@@ -122,9 +122,6 @@ void WernerAlgo2::run_dp_in_t(const Path& path, const DPParam& dpp,int t) {
                     if(L.Z<=dpp.Zhat){
                         L.ent_time={t-i-1,t};
                         cand.push_back(L);
-                        if(i>0) cerr << "[ZFA2:dp] purified leaf added! t=" << t << " a=" << a << " b=" << b << " purify_type=" << i << " Z=" << (double)L.Z << " Zhat=" << (double)dpp.Zhat << endl;
-                    } else {
-                        if(i>0) cerr << "[ZFA2:dp] purified leaf REJECTED t=" << t << " tlen=" << i+1 << " Z=" << (double)L.Z << " Zhat=" << (double)dpp.Zhat << endl;
                     }
                 }
             }
