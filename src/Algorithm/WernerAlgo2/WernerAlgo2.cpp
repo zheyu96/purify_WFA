@@ -76,13 +76,19 @@ Shape_vector WernerAlgo2::separation_oracle(){
     }
     if(!todo_shape.empty()){
         shape_purify_map[todo_shape]=best_purify_rounds;
-        // debug: 印出 oracle 選到的 purify rounds
+        // debug: 印出 oracle 選到的 purify rounds 和 shape 結構
         bool has_purify = false;
         for(int r : best_purify_rounds) if(r > 0) has_purify = true;
-        if(has_purify) cerr << "[ZFA2:oracle] selected shape with purify_rounds:";
-        else cerr << "[ZFA2:oracle] selected shape WITHOUT purification, rounds:";
+        cerr << "[ZFA2:oracle] " << (has_purify ? "PURIFIED" : "no-purify")
+             << " rounds:";
         for(int r : best_purify_rounds) cerr << " " << r;
-        cerr << endl;
+        cerr << " | shape nodes:";
+        for(auto& sv : todo_shape) {
+            cerr << " " << sv.first << "[";
+            for(auto& rng : sv.second) cerr << rng.first << "-" << rng.second << ",";
+            cerr << "]";
+        }
+        cerr << " | J=" << (double)most_violate << endl;
     }
     return todo_shape;
 }
