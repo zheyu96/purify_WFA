@@ -340,6 +340,12 @@ void WernerAlgo2::run() {
             cerr << "[ZFA2] oracle done, shape.size()=" << shape.size() << endl;
             if (shape.empty()) break;
             // 先用MyAlgo1的框架刻出來
+            cerr << "[ZFA2:run] shape details:" << endl;
+            for(int i=0;i<(int)shape.size();i++){
+                cerr << "  shape[" << i << "] node=" << shape[i].first << " intervals=" << shape[i].second.size() << ":";
+                for(auto& p : shape[i].second) cerr << " [" << p.first << "," << p.second << "]";
+                cerr << endl;
+            }
             double q = 1.0;
             for(int i=0;i<shape.size();i++){
                 map<int,int> need_amount;
@@ -351,6 +357,7 @@ void WernerAlgo2::run() {
                 for(pair<int,int>P:need_amount){
                     int t=P.first;
                     double theta=P.second;
+                    cerr << "[ZFA2:run] get_node_memory_at node=" << shape[i].first << " t=" << t << " V=" << graph.get_num_nodes() << " T=" << graph.get_time_limit() << endl;
                     q=min(q,graph.get_node_memory_at(shape[i].first,t)/theta);
                 }
             }
