@@ -74,6 +74,7 @@ public:
 
     double path_Pr(Path path);
     double path_Pr(Shape shape);
+    double path_Pr_purify(Shape shape);
     bool check_path_resource(Path path, int amount);
     void reserve_path(Path path);
     void reserve_path(Path path, int amount);

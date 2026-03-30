@@ -330,19 +330,42 @@ void WernerAlgo2::run() {
             Shape_vector shape=separation_oracle();
             if (shape.empty()) break;
             // 先用MyAlgo1的框架刻出來
+            // 取得此 shape 對應的 purify rounds
+            vector<int> cur_purify_rounds;
+            if(shape_purify_map.count(shape))
+                cur_purify_rounds = shape_purify_map[shape];
+
             double q = 1.0;
-            for(int i=0;i<shape.size();i++){
-                map<int,int> need_amount;
+            // 先算基本 memory 需求
+            map<pair<int,int>, int> total_need_q; // (node, t) -> total amount
+            for(int i=0;i<(int)shape.size();i++){
                 for(pair<int,int> usedtime:shape[i].second){
                     int start=usedtime.first,end=usedtime.second;
                     for(int t=start;t<=end;t++)
-                        need_amount[t]++;
+                        total_need_q[{shape[i].first, t}]++;
                 }
-                for(pair<int,int>P:need_amount){
-                    int t=P.first;
-                    double theta=P.second;
-                    q=min(q,graph.get_node_memory_at(shape[i].first,t)/theta);
+            }
+            // 加入 purification 額外 memory 需求
+            for(int li=0; li<(int)shape.size()-1; li++){
+                int rounds = (li < (int)cur_purify_rounds.size()) ? cur_purify_rounds[li] : 0;
+                if(rounds <= 0) continue;
+                int link_start = shape[li].second.back().first;
+                int u = shape[li].first, v = shape[li+1].first;
+                for(int ti=0; ti<=rounds; ti++){
+                    int extra = (int)Purify_in_vt[rounds][ti] - 1;
+                    if(extra <= 0) continue;
+                    int t = link_start + ti;
+                    if(t >= graph.get_time_limit()) continue;
+                    total_need_q[{u, t}] += extra;
+                    total_need_q[{v, t}] += extra;
                 }
+            }
+            for(auto& P : total_need_q){
+                int node_id = P.first.first, t = P.first.second;
+                double theta = P.second;
+                double cap = graph.get_node_memory_at(node_id, t);
+                if(cap > 0) q = min(q, cap / theta);
+                else q = 0;
             }
             if(q<=1e-10) break;
             int req_idx=-1;
@@ -359,26 +382,17 @@ void WernerAlgo2::run() {
             double ori=alpha[req_idx];
             alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
             obj+=(alpha[req_idx]-ori);
-            for(int i=0;i<shape.size();i++){
-                map<int,int> need_amount;
-                for(pair<int,int> usedtime:shape[i].second){
-                    int start=usedtime.first,end=usedtime.second;
-                    for(int t=start;t<=end;t++)
-                        need_amount[t]++;
+            // 用 total_need_q（含 purification 額外 memory）來更新 beta
+            for(auto& P : total_need_q){
+                int node_id = P.first.first, t = P.first.second;
+                double theta = P.second;
+                double original = beta[node_id][t];
+                if(graph.get_node_memory_at(node_id, t) == 0) {
+                    beta[node_id][t] = INF;
+                } else {
+                    beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
                 }
-
-                for(pair<int, int> P : need_amount) {
-                    int t = P.first;
-                    int node_id = shape[i].first;
-                    double theta = P.second;
-                    double original = beta[node_id][t];
-                    if(graph.get_node_memory_at(node_id, t) == 0) {
-                        beta[node_id][t] = INF;
-                    } else {
-                        beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
-                    }
-                    obj += (beta[node_id][t] - original) * theta;
-                }
+                obj += (beta[node_id][t] - original) * theta;
             }
         }
         vector<pair<double, Shape_vector>> shapes;

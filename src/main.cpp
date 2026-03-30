@@ -62,7 +62,7 @@ vector<SDpair> generate_requests(Graph graph, int requests_cnt, int length_lower
 
     return requests;
 }
-vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 0.73) {
+vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 0.85) {
     int n = graph.get_num_nodes();
     vector<pair<SDpair,double>> cand[22];
     random_device rd;
@@ -132,11 +132,11 @@ int main(){
     default_setting["request_cnt"] = 50;
     default_setting["entangle_lambda"] = 0.045;
     default_setting["time_limit"] = 20;
-    default_setting["avg_memory"] = 10; // 16
+    default_setting["avg_memory"] = 20; // 16
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
-    default_setting["min_fidelity"] = 0.80;
-    default_setting["max_fidelity"] = 0.90;
+    default_setting["min_fidelity"] = 0.89;
+    default_setting["max_fidelity"] = 1;
     default_setting["swap_prob"] = 0.9;
     default_setting["fidelity_threshold"] = 0.7;
     default_setting["entangle_time"] = 0.00025;
@@ -145,7 +145,7 @@ int main(){
     default_setting["bucket_eps"]=0.01;
     default_setting["time_eta"]=0.001;
     default_setting["hop_count"]=3;
-    default_setting["delta_P"]=0.01;
+    default_setting["delta_P"]=0.000000001;
     map<string, vector<double>> change_parameter;
     change_parameter["request_cnt"] = {10,30,50,70,90};
     change_parameter["num_nodes"] = {40, 70, 100, 130, 160};
@@ -198,7 +198,7 @@ int main(){
         }
         Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
         //default_requests[r] = generate_requests(graph, 190, length_lower, length_upper);
-        default_requests[r]=generate_requests_fid(graph,250,0.67,2);
+        default_requests[r]=generate_requests_fid(graph,250,0.6,3);
         //cerr<<"Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;
         assert(!default_requests[r].empty());
         //cerr  << "Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;
@@ -281,7 +281,7 @@ int main(){
 
 
 
-                    double A = 0.25, B = 0.75, tao = input_parameter["tao"], T = 0.04, n = 2;
+                    double A = 0.25, B = 0.75, tao = input_parameter["tao"], T = 10, n = 2;
                     Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
 
                     ofs << "--------------- in round " << r << " -------------" <<endl;

@@ -313,10 +313,11 @@ void Graph::reserve_shape_ASAP(Shape shape, bool enable_purification) {
     double shape_fidelity = shape.get_fidelity(A, B, n, T, tao, F_init, enable_purification);
     if(shape_fidelity > fidelity_threshold) {
         int src=nm.front().first,dst=nm.back().first;
-        cerr<<"\033[1;34m"<<"initial fid = "<<get_ini_fid(src,dst)<<" real fidelity = "<<shape_fidelity<<" hop count = "<<(nm.size()-1)<<"\033[0m"<<endl;
-        fidelity_gain += ((shape_fidelity*3.0L-1.0L)/4.0L * path_Pr(shape));
+        double pr = enable_purification ? path_Pr_purify(shape) : path_Pr(shape);
+        cerr<<"\033[1;34m"<<"initial fid = "<<get_ini_fid(src,dst)<<" real fidelity = "<<shape_fidelity<<" hop count = "<<(nm.size()-1)<<" prob = "<<pr<<"\033[0m"<<endl;
+        fidelity_gain += ((shape_fidelity*3.0L-1.0L)/4.0L * pr);
         pure_fidelity += shape_fidelity;
-        succ_request_cnt += path_Pr(shape);
+        succ_request_cnt += pr;
     }
 
     for(int i = 0; i < (int)boundary.size(); i++) {
@@ -378,10 +379,11 @@ void Graph::reserve_shape(Shape shape, bool enable_purification /*= false*/) {
         exit(1);
     }
     int src=nm.front().first,dst=nm.back().first;
-    cerr<<"\033[1;34m"<<"initial fid = "<<get_ini_fid(src,dst)<<" real fidelity = "<<shape_fidelity<<" hop count = "<<(nm.size()-1)<<"\033[0m"<<endl;
-    fidelity_gain += ((shape_fidelity*4.0L-1.0L)/3.0L * path_Pr(shape));
+    double pr = enable_purification ? path_Pr_purify(shape) : path_Pr(shape);
+    cerr<<"\033[1;34m"<<"initial fid = "<<get_ini_fid(src,dst)<<" real fidelity = "<<shape_fidelity<<" hop count = "<<(nm.size()-1)<<" prob = "<<pr<<"\033[0m"<<endl;
+    fidelity_gain += ((shape_fidelity*4.0L-1.0L)/3.0L * pr);
     pure_fidelity += shape_fidelity;
-    succ_request_cnt += path_Pr(shape);
+    succ_request_cnt += pr;
 
     for(int i = 0; i < (int)boundary.size(); i++) {
         if(shape_fidelity < boundary[i]) {
@@ -434,10 +436,11 @@ void Graph::reserve_shape2(Shape shape, bool enable_purification) {
     double shape_fidelity = shape.get_fidelity(A, B, n, T, tao, F_init, enable_purification);
     if(shape_fidelity > fidelity_threshold) {
         int src=nm.front().first,dst=nm.back().first;
-        cerr<<"\033[1;34m"<<"initial fid = "<<get_ini_fid(src,dst)<<" real fidelity = "<<shape_fidelity<<" hop count = "<<(nm.size()-1)<<"\033[0m"<<endl;
-        fidelity_gain += ((shape_fidelity*4.0L-1.0L)/3.0L * path_Pr(shape));
+        double pr = enable_purification ? path_Pr_purify(shape) : path_Pr(shape);
+        cerr<<"\033[1;34m"<<"initial fid = "<<get_ini_fid(src,dst)<<" real fidelity = "<<shape_fidelity<<" hop count = "<<(nm.size()-1)<<" prob = "<<pr<<"\033[0m"<<endl;
+        fidelity_gain += ((shape_fidelity*4.0L-1.0L)/3.0L * pr);
         pure_fidelity += shape_fidelity;
-        succ_request_cnt += path_Pr(shape);
+        succ_request_cnt += pr;
     }
 
     for(int i = 0; i < (int)boundary.size(); i++) {
@@ -465,6 +468,41 @@ double Graph::path_Pr(Shape shape) {
         path.push_back(P.first);
     }
     return path_Pr(path);
+}
+
+double Graph::path_Pr_purify(Shape shape) {
+    Shape_vector nm = shape.get_node_mem_range();
+    vector<int> pr = shape.get_link_purify_rounds();
+    double Pr = 1.0;
+
+    // 每條 link 的 entanglement + purification 成功機率
+    for(int i = 0; i < (int)nm.size() - 1; i++) {
+        int u = nm[i].first, v = nm[i + 1].first;
+        int rounds = (i < (int)pr.size()) ? pr[i] : 0;
+
+        double p_link = get_entangle_succ_prob(u, v);
+        if(rounds > 0) {
+            double w_ini = get_link_werner(u, v);
+            double w_cur = w_ini;
+            for(int r = 0; r < rounds; r++) {
+                // purification 成功機率 (Eq.8)
+                p_link *= (9.0 * w_cur * w_ini - 3.0 * w_ini - 3.0 * w_cur + 5.0) / 8.0;
+                // 額外 entanglement
+                p_link *= get_entangle_succ_prob(u, v);
+                // 更新 werner parameter
+                w_cur = (3.0 * w_cur * w_ini + 3.0 * w_cur + 3.0 * w_ini - 1.0)
+                      / (9.0 * w_cur * w_ini - 3.0 * w_cur - 3.0 * w_ini + 5.0);
+            }
+        }
+        Pr *= p_link;
+    }
+
+    // 中間節點的 swap 成功機率
+    for(int i = 1; i < (int)nm.size() - 1; i++) {
+        Pr *= nodes[nm[i].first].get_swap_prob();
+    }
+
+    return Pr;
 }
 
 void Graph::reserve_path(Path path, int amount) {
