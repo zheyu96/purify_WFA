@@ -134,7 +134,7 @@ with open(path, 'w') as f:
             if ratio > 0.98:
                 ratio = 0.98
             if ratio < 0.7:
-                ratio = 0.87
+                ratio = 0.7
             F = ratio
             print(e0 + " " + e1 + " " + str(F), file=f)
             avg_l += dis

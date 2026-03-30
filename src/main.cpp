@@ -62,8 +62,7 @@ vector<SDpair> generate_requests(Graph graph, int requests_cnt, int length_lower
 
     return requests;
 }
-vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th) {
-    double fid_max=0.9;
+vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 0.8) {
     int n = graph.get_num_nodes();
     vector<pair<SDpair,double>> cand[22];
     random_device rd;
@@ -76,7 +75,7 @@ vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th
             double fid = graph.get_ini_fid(i,j);
             //cerr<<"fid of "<<i<<" "<<j<<" : "<<fid<<endl;
             assert(fid>=0.0&&fid<=1.0);
-            if(fid > fid_th&&graph.distance(i,j)>=hop_th) {
+            if(fid > fid_th && fid <= fid_upper && graph.distance(i,j)>=hop_th) {
                 int index = fid/0.05;
                 //index-=5;
                 if(index < 0) continue;
@@ -136,8 +135,8 @@ int main(){
     default_setting["avg_memory"] = 10; // 16
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
-    default_setting["min_fidelity"] = 0.78;
-    default_setting["max_fidelity"] = 0.78;
+    default_setting["min_fidelity"] = 0.80;
+    default_setting["max_fidelity"] = 0.90;
     default_setting["swap_prob"] = 0.9;
     default_setting["fidelity_threshold"] = 0.7;
     default_setting["entangle_time"] = 0.00025;
@@ -199,7 +198,7 @@ int main(){
         }
         Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
         //default_requests[r] = generate_requests(graph, 190, length_lower, length_upper);
-        default_requests[r]=generate_requests_fid(graph,250,0.6,2);
+        default_requests[r]=generate_requests_fid(graph,250,0.67,2);
         //cerr<<"Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;
         assert(!default_requests[r].empty());
         //cerr  << "Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;
