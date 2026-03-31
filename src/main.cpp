@@ -168,18 +168,24 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
     double eta = graph.get_tao() / graph.get_time_limit();  // per-slot η in code's convention
     double kappa = graph.get_n();  // κ
 
-    vector<pair<double, SDpair>> candidates;  // (margin, sd_pair)，margin = w_pur/w_th 越大越好
+    vector<pair<double, SDpair>> candidates;  // (margin, sd_pair)
+
+    // 診斷用
+    struct HopDiag { int total=0, pass_no=0, sweet=0, fail_both=0; double sum_w=0; };
+    map<int, HopDiag> diag;
+
+    double tao_val = graph.get_tao();
+    double T_param = graph.get_T();
+    double n_param = graph.get_n();
+    double w_decay_per_slot = exp(-pow(tao_val / T_param, n_param));
 
     for (int i = 0; i < n; i++) {
         for (int j = i + 1; j < n; j++) {
             vector<int> path = bfs_path(i, j);
             if (path.empty()) continue;
-            int h = (int)path.size() - 1;  // hop count
+            int h = (int)path.size() - 1;
             if (h < min_hop) continue;
 
-            // 計算不做 purify 的 end-to-end Werner（含 decoherence）
-            // W-domain: W_total = sqrt( Σ (W_e_k + waiting_k * η)^κ ) for κ=2
-            // 簡化：balanced schedule, 每個 leaf 等 ~log2(h) slots
             double w_no_purify = 1.0;
             double w_purify = 1.0;
             for (int k = 1; k <= h; k++) {
@@ -189,35 +195,40 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
                 w_purify *= w_e_pur;
             }
 
-            // 加入 decoherence：balanced schedule 約需 (1+log2(h)) slots（不做 purify）
-            //                   做 purify 約需 (2+log2(h)) slots
             int slots_no = 1 + (int)ceil(log2(max(h, 1)));
             int slots_pur = 2 + (int)ceil(log2(max(h, 1)));
-            // W-domain decoherence: w *= exp(-(slots * η)^κ) 近似
-            // 但 η 在 code 中很小，嚴謹做法是用 W-domain 遞迴
-            // 這裡用簡化近似：w_decayed = w * exp(-(slots * eta_raw)^kappa)
-            // 其中 eta_raw = tao（pass_tao 對應的時間量）
-            double tao = graph.get_tao();
-            double T_param = graph.get_T();
-            double n_param = graph.get_n();
-            // 每個 slot 的 Werner decay: w_d(δ) = exp(-(tao/T)^n)
-            double w_decay_per_slot = exp(-pow(tao / T_param, n_param));
-            // 最早建立的 pair 等最久
             double w_no_decayed = w_no_purify * pow(w_decay_per_slot, slots_no);
             double w_pur_decayed = w_purify * pow(w_decay_per_slot, slots_pur);
 
-            // 甜蜜點：不做 purify 過不了，做了能過
-            if (w_no_decayed < w_th && w_pur_decayed >= w_th) {
-                double margin = w_pur_decayed / w_th;  // 越大越穩
+            // 診斷統計
+            diag[h].total++;
+            diag[h].sum_w += w_no_decayed;
+            if (w_no_decayed >= w_th) {
+                diag[h].pass_no++;
+            } else if (w_pur_decayed >= w_th) {
+                diag[h].sweet++;
+                double margin = w_pur_decayed / w_th;
                 candidates.push_back({margin, {i, j}});
-                candidates.push_back({margin, {j, i}});  // 雙向
+                candidates.push_back({margin, {j, i}});
+            } else {
+                diag[h].fail_both++;
             }
         }
     }
 
+    // 診斷：統計各 hop 數的 w_no 分佈
+    cerr << "\033[1;33m" << "[purify_needed] diagnostics (w_th=" << w_th << "):" << "\033[0m" << endl;
+    for (auto &[hop, stats] : diag) {
+        cerr << "  hop=" << hop
+             << " | pairs=" << stats.total
+             << " | pass_no_purify=" << stats.pass_no
+             << " | need_purify_and_ok=" << stats.sweet
+             << " | fail_even_purify=" << stats.fail_both
+             << " | avg_w_no=" << (stats.total > 0 ? stats.sum_w / stats.total : 0)
+             << endl;
+    }
     cerr << "\033[1;33m" << "[purify_needed] found " << candidates.size()
-         << " SD pairs in purification sweet spot (w_th=" << w_th
-         << ", fid_th=" << fid_th << ")" << "\033[0m" << endl;
+         << " SD pairs in purification sweet spot" << "\033[0m" << endl;
 
     if (candidates.empty()) {
         cerr << "\033[1;31m" << "[purify_needed] WARNING: no pairs found! "
@@ -266,10 +277,14 @@ int main(){
     default_setting["avg_memory"] = 20; // 16
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
-    default_setting["min_fidelity"] = 0.89;
-    default_setting["max_fidelity"] = 1;
+    // === Purification 甜蜜點參數 ===
+    // min_fidelity 降低使 w_e 落在 ~0.73-0.87，讓 3-4 hop 就需要 purify
+    // fidelity_threshold 提高使 w_th 更嚴格，擴大甜蜜點範圍
+    // 原始值: min_fidelity=0.89, fidelity_threshold=0.7
+    default_setting["min_fidelity"] = 0.78;
+    default_setting["max_fidelity"] = 0.93;
     default_setting["swap_prob"] = 0.9;
-    default_setting["fidelity_threshold"] = 0.7;
+    default_setting["fidelity_threshold"] = 0.75;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
     default_setting["Zmin"]=0.02702867239;
