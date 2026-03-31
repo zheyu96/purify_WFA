@@ -346,13 +346,14 @@ void WernerAlgo2::run() {
                 }
             }
             // 加入 purification 額外 memory 需求
+            // 注意：Purify_in_vt 的 index 0 對應最新時間 (link_end)，需反向對應
             for(int li=0; li<(int)shape.size()-1; li++){
                 int rounds = (li < (int)cur_purify_rounds.size()) ? cur_purify_rounds[li] : 0;
                 if(rounds <= 0) continue;
                 int link_start = shape[li].second.back().first;
                 int u = shape[li].first, v = shape[li+1].first;
-                for(int ti=0; ti<=rounds; ti++){
-                    int extra = (int)Purify_in_vt[rounds][ti] - 1;
+                for(int ti=0; ti<=rounds+1; ti++){
+                    int extra = (int)Purify_in_vt[rounds][rounds + 1 - ti] - 1;
                     if(extra <= 0) continue;
                     int t = link_start + ti;
                     if(t >= graph.get_time_limit()) continue;
@@ -446,14 +447,14 @@ void WernerAlgo2::run() {
                             total_need[{node, t}]++;
                     }
                 }
-                // purification 額外需求
+                // purification 額外需求（index 需反向對應 gen_leaf_label）
                 for(size_t li = 0; li < sv_chk.size() - 1; ++li) {
                     int rounds = (li < pr_chk.size()) ? pr_chk[li] : 0;
                     if(rounds <= 0) continue;
                     int link_start = sv_chk[li].second.back().first;
                     int u = sv_chk[li].first, v = sv_chk[li+1].first;
-                    for(int ti = 0; ti <= rounds; ++ti) {
-                        int extra = (int)Purify_in_vt[rounds][ti] - 1;
+                    for(int ti = 0; ti <= rounds + 1; ++ti) {
+                        int extra = (int)Purify_in_vt[rounds][rounds + 1 - ti] - 1;
                         if(extra <= 0) continue;
                         int t = link_start + ti;
                         if(t >= graph.get_time_limit()) { resource_ok = false; break; }
@@ -473,6 +474,7 @@ void WernerAlgo2::run() {
                 used[request_index] = true;
                 graph.reserve_shape(shape, true);
                 // 額外扣除 purification 多消耗的 memory（標準 Shape 已扣 1，這裡補扣剩餘）
+                // index 需反向對應 gen_leaf_label
                 {
                     Shape_vector sv_res = shape.get_node_mem_range();
                     vector<int> pr_res = shape.get_link_purify_rounds();
@@ -481,8 +483,8 @@ void WernerAlgo2::run() {
                         if(rounds <= 0) continue;
                         int link_start = sv_res[li].second.back().first;
                         int u = sv_res[li].first, v = sv_res[li+1].first;
-                        for(int ti = 0; ti <= rounds; ++ti) {
-                            int extra = (int)Purify_in_vt[rounds][ti] - 1;
+                        for(int ti = 0; ti <= rounds + 1; ++ti) {
+                            int extra = (int)Purify_in_vt[rounds][rounds + 1 - ti] - 1;
                             if(extra <= 0) continue;
                             int t = link_start + ti;
                             graph.reserve_node_memory_at(u, t, extra);
