@@ -6,6 +6,7 @@ dependency = Network/Node/Node.o Network/Shape/Shape.o Network/Graph/Graph.o Alg
 algorithm = Algorithm/MyAlgo1/MyAlgo1.o Algorithm/MyAlgo2/MyAlgo2.o Algorithm/MyAlgo3/MyAlgo3.o \
             Algorithm/MyAlgo4/MyAlgo4.o Algorithm/MyAlgo5/MyAlgo5.o Algorithm/MyAlgo6/MyAlgo6.o \
             Algorithm/WernerAlgo/WernerAlgo.o Algorithm/WernerAlgo2/WernerAlgo2.o \
+            Algorithm/WernerAlgo3/WernerAlgo3.o \
             Algorithm/WernerAlgo_UB/WernerAlgo_UB.o
 
 # 時間量測專用演算法物件
@@ -81,6 +82,8 @@ Algorithm/WernerAlgo/WernerAlgo.o: Algorithm/WernerAlgo/WernerAlgo.cpp Algorithm
 	g++ -c $(gcc_flag) Algorithm/WernerAlgo/WernerAlgo.cpp -o Algorithm/WernerAlgo/WernerAlgo.o
 Algorithm/WernerAlgo2/WernerAlgo2.o: Algorithm/WernerAlgo2/WernerAlgo2.cpp Algorithm/WernerAlgo2/WernerAlgo2.h config.h
 	g++ -c $(gcc_flag) Algorithm/WernerAlgo2/WernerAlgo2.cpp -o Algorithm/WernerAlgo2/WernerAlgo2.o
+Algorithm/WernerAlgo3/WernerAlgo3.o: Algorithm/WernerAlgo3/WernerAlgo3.cpp Algorithm/WernerAlgo3/WernerAlgo3.h config.h
+	g++ -c $(gcc_flag) Algorithm/WernerAlgo3/WernerAlgo3.cpp -o Algorithm/WernerAlgo3/WernerAlgo3.o
 Algorithm/WernerAlgo_UB/WernerAlgo_UB.o: Algorithm/WernerAlgo_UB/WernerAlgo_UB.cpp Algorithm/WernerAlgo_UB/WernerAlgo_UB.h config.h
 	g++ -c $(gcc_flag) Algorithm/WernerAlgo_UB/WernerAlgo_UB.cpp -o Algorithm/WernerAlgo_UB/WernerAlgo_UB.o
 

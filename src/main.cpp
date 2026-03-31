@@ -10,6 +10,7 @@
 #include "Algorithm/MyAlgo6/MyAlgo6.h"
 #include "Algorithm/WernerAlgo/WernerAlgo.h"
 #include "Algorithm/WernerAlgo2/WernerAlgo2.h"
+#include "Algorithm/WernerAlgo3/WernerAlgo3.h"
 #include "Algorithm/WernerAlgo_UB/WernerAlgo_UB.h"
 #include "Network/PathMethod/PathMethodBase/PathMethod.h"
 #include "Network/PathMethod/Greedy/Greedy.h"
@@ -160,9 +161,14 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
         return path;
     };
 
-    // Eq.8: 1 round pumping purification
-    auto purified_werner = [](double w_e) -> double {
-        return (3.0*w_e*w_e + 6.0*w_e - 1.0) / (9.0*w_e*w_e - 6.0*w_e + 5.0);
+    // Eq.8: r rounds pumping purification
+    auto purified_werner = [](double w_e, int rounds) -> double {
+        double w_cur = w_e;
+        for (int r = 0; r < rounds; r++) {
+            w_cur = (3.0*w_cur*w_e + 3.0*w_cur + 3.0*w_e - 1.0)
+                  / (9.0*w_cur*w_e - 3.0*w_cur - 3.0*w_e + 5.0);
+        }
+        return w_cur;
     };
 
     // 考慮時間衰退：W-domain 中每個 edge 加上 decoherence
@@ -185,6 +191,8 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
     double n_param = graph.get_n();
     double w_decay_per_slot = exp(-pow(tao_val / T_param, n_param));
 
+    const int max_purify_rounds = 3;  // 最多考慮 3 rounds purification
+
     for (int i = 0; i < n; i++) {
         for (int j = i + 1; j < n; j++) {
             vector<int> path = bfs_path(i, j);
@@ -192,36 +200,49 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
             int h = (int)path.size() - 1;
             if (h < min_hop) continue;
 
+            // 收集每條 edge 的 w_e
+            vector<double> w_edges(h);
             double w_no_purify = 1.0;
-            double w_purify = 1.0;
-            for (int k = 1; k <= h; k++) {
-                double w_e = graph.get_link_werner(path[k-1], path[k]);
-                double w_e_pur = purified_werner(w_e);
-                w_no_purify *= w_e;
-                w_purify *= w_e_pur;
+            for (int k = 0; k < h; k++) {
+                w_edges[k] = graph.get_link_werner(path[k], path[k+1]);
+                w_no_purify *= w_edges[k];
             }
 
             int slots_no = 1 + (int)ceil(log2(max(h, 1)));
-            int slots_pur = 2 + (int)ceil(log2(max(h, 1)));
             double w_no_decayed = w_no_purify * pow(w_decay_per_slot, slots_no);
-            double w_pur_decayed = w_purify * pow(w_decay_per_slot, slots_pur);
 
             diag[h].total++;
             diag[h].sum_w += w_no_decayed;
 
-            if (w_no_decayed < w_th && w_pur_decayed >= w_th) {
-                // A: 嚴格甜蜜點 — 不做 purify 過不了，做了能過
+            // 嘗試 1, 2, 3 rounds purification，找最少 rounds 就能過 threshold 的
+            int best_rounds = -1;
+            double best_w_pur = 0;
+            for (int rr = 1; rr <= max_purify_rounds; rr++) {
+                double w_pur = 1.0;
+                for (int k = 0; k < h; k++)
+                    w_pur *= purified_werner(w_edges[k], rr);
+                int slots_pur = (1 + rr) + (int)ceil(log2(max(h, 1)));
+                double w_pur_decayed = w_pur * pow(w_decay_per_slot, slots_pur);
+                if (w_pur_decayed >= w_th) {
+                    best_rounds = rr;
+                    best_w_pur = w_pur_decayed;
+                    break;  // 用最少 rounds 就行
+                }
+            }
+
+            if (w_no_decayed < w_th && best_rounds > 0) {
+                // A: 嚴格甜蜜點 — 不做 purify 過不了，做 best_rounds 輪能過
                 diag[h].sweet++;
-                double score = 2.0 + w_pur_decayed / w_th;  // 高優先
+                // score: rounds 少的優先（資源省），同 rounds 內 margin 大的優先
+                double score = 3.0 - best_rounds * 0.3 + best_w_pur / w_th * 0.1;
                 candidates.push_back({score, {i, j}});
                 candidates.push_back({score, {j, i}});
             } else if (w_no_decayed >= w_th && w_no_decayed < w_th * margin_ratio
-                       && w_pur_decayed >= w_th) {
-                // B: 邊緣受益者 — 不做 purify 勉強過，但做 purify 後 w 大幅提升
-                //    purify 提升 Pr*w 的幅度 = w_pur / w_no（fidelity 提升比例）
+                       && best_rounds > 0) {
+                // B: 邊緣受益者
                 diag[h].marginal++;
-                double boost = w_pur_decayed / w_no_decayed;  // purify 帶來的 w 倍率
-                double score = 1.0 + boost / 10.0;  // 低於 A 但有價值
+                double boost = best_w_pur / w_no_decayed;
+                double score = 1.0 + boost / 10.0;
                 candidates.push_back({score, {i, j}});
                 candidates.push_back({score, {j, i}});
             } else if (w_no_decayed >= w_th * margin_ratio) {
@@ -234,12 +255,12 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
 
     // 診斷
     cerr << "\033[1;33m" << "[purify_needed] diagnostics (w_th=" << w_th
-         << ", margin=" << margin_ratio << "):" << "\033[0m" << endl;
+         << ", margin=" << margin_ratio << ", max_rounds=" << max_purify_rounds << "):" << "\033[0m" << endl;
     for (auto &[hop, stats] : diag) {
         cerr << "  hop=" << hop
              << " | pairs=" << stats.total
              << " | comfy_pass=" << stats.pass_no
-             << " | marginal(purify_helps)=" << stats.marginal
+             << " | marginal=" << stats.marginal
              << " | strict_sweet=" << stats.sweet
              << " | fail_both=" << stats.fail_both
              << " | avg_w_no=" << (stats.total > 0 ? stats.sum_w / stats.total : 0)
@@ -255,28 +276,54 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
         return {};
     }
 
-    // 按 margin 排序（穩定度高的優先），再 shuffle 同 margin 的
-    sort(candidates.begin(), candidates.end(), [](auto &a, auto &b) {
-        return a.first > b.first;
-    });
+    // 按 hop 數分桶，每桶內 shuffle，然後 round-robin 均勻抽取
+    map<int, vector<SDpair>> hop_buckets;
+    for (auto &[score, sd] : candidates) {
+        vector<int> p = bfs_path(sd.first, sd.second);
+        int h = p.empty() ? 0 : (int)p.size() - 1;
+        hop_buckets[h].push_back(sd);
+    }
 
     random_device rd;
     default_random_engine gen(rd());
-    vector<SDpair> requests;
-    // 每個 pair 重複 3~6 次，直到達標
-    uniform_int_distribution<int> rep_dist(3, 6);
-    int idx = 0;
-    while ((int)requests.size() < requests_cnt && idx < (int)candidates.size()) {
-        int rep = min(rep_dist(gen), requests_cnt - (int)requests.size());
-        for (int r = 0; r < rep; r++)
-            requests.push_back(candidates[idx].second);
-        idx++;
+
+    // 每桶 shuffle
+    vector<pair<int, vector<SDpair>>> buckets_vec;
+    for (auto &[h, vec] : hop_buckets) {
+        shuffle(vec.begin(), vec.end(), gen);
+        buckets_vec.push_back({h, vec});
     }
-    // 不夠就循環填充
-    idx = 0;
+
+    cerr << "\033[1;33m" << "[purify_needed] hop distribution:";
+    for (auto &[h, vec] : buckets_vec)
+        cerr << " hop" << h << "=" << vec.size();
+    cerr << "\033[0m" << endl;
+
+    // Round-robin：輪流從每個 hop 桶取，每次取 2~4 個同 SD pair
+    vector<SDpair> requests;
+    vector<int> pos(buckets_vec.size(), 0);
+    uniform_int_distribution<int> rep_dist(2, 4);
+    int bucket_idx = 0;
     while ((int)requests.size() < requests_cnt) {
-        requests.push_back(candidates[idx % candidates.size()].second);
-        idx++;
+        // 找到一個還有 pair 的桶
+        bool found = false;
+        for (int try_cnt = 0; try_cnt < (int)buckets_vec.size(); try_cnt++) {
+            int bi = (bucket_idx + try_cnt) % (int)buckets_vec.size();
+            if (pos[bi] < (int)buckets_vec[bi].second.size()) {
+                int rep = min(rep_dist(gen), requests_cnt - (int)requests.size());
+                for (int r = 0; r < rep; r++)
+                    requests.push_back(buckets_vec[bi].second[pos[bi]]);
+                pos[bi]++;
+                bucket_idx = (bi + 1) % (int)buckets_vec.size();
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            // 所有桶都用完，循環重來
+            for (int i = 0; i < (int)pos.size(); i++) pos[i] = 0;
+            for (auto &[h, vec] : buckets_vec) shuffle(vec.begin(), vec.end(), gen);
+        }
     }
     requests.resize(requests_cnt);
 
@@ -361,14 +408,46 @@ int main(){
             exit(1);
         }
         Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
-        //default_requests[r] = generate_requests(graph, 190, length_lower, length_upper);
-        //default_requests[r]=generate_requests_fid(graph,250,0.6,3);
-        // 使用 purify 甜蜜點 request 生成：只保留「不做 purify 過不了、做了就能過」的 SD pair
-        default_requests[r] = generate_requests_purify_needed(graph, 250, 3);
-        if (default_requests[r].empty()) {
-            cerr << "[fallback] purify_needed found no pairs, falling back to generate_requests_fid" << endl;
-            default_requests[r] = generate_requests_fid(graph, 250, 0.6, 3);
+        // 混合生成：purify 甜蜜點為主(70%)，baseline 為輔(30%)
+        // 關鍵：交錯排列，確保任何前綴（request_cnt=10,30,...）都有均勻的 hop 分佈
+        int total_cnt = 250;
+        int purify_cnt = (int)(total_cnt * 0.7);
+        int baseline_cnt = total_cnt - purify_cnt;
+
+        // min_hop=2：包含 2-hop 的 purify request
+        auto purify_reqs = generate_requests_purify_needed(graph, purify_cnt, 2);
+        auto baseline_reqs = generate_requests_fid(graph, baseline_cnt, fidelity_threshold + 0.01, 2);
+
+        if (purify_reqs.empty()) {
+            cerr << "[fallback] purify_needed found no pairs, using all baseline" << endl;
+            default_requests[r] = generate_requests_fid(graph, total_cnt, 0.6, 2);
+        } else {
+            // 交錯排列：每 round 放 1 個 purify, 然後每 ~2-3 個 purify 穿插 1 個 baseline
+            // 這樣任何前綴都有 ~70% purify + ~30% baseline 的比例
+            default_requests[r].clear();
+            int pi = 0, bi = 0;
+            int purify_per_cycle = 2;  // 每個 cycle 放 2 個 purify + 1 個 baseline ≈ 67% purify
+            while ((int)default_requests[r].size() < total_cnt) {
+                // 放 purify_per_cycle 個 purify request
+                for (int k = 0; k < purify_per_cycle && (int)default_requests[r].size() < total_cnt; k++) {
+                    if (pi < (int)purify_reqs.size())
+                        default_requests[r].push_back(purify_reqs[pi++]);
+                    else if (bi < (int)baseline_reqs.size())
+                        default_requests[r].push_back(baseline_reqs[bi++]);
+                }
+                // 放 1 個 baseline request
+                if ((int)default_requests[r].size() < total_cnt) {
+                    if (bi < (int)baseline_reqs.size())
+                        default_requests[r].push_back(baseline_reqs[bi++]);
+                    else if (pi < (int)purify_reqs.size())
+                        default_requests[r].push_back(purify_reqs[pi++]);
+                }
+            }
+            default_requests[r].resize(total_cnt);
         }
+        cerr << "\033[1;36m" << "[requests] total=" << default_requests[r].size()
+             << " (purify_sweet=" << purify_reqs.size()
+             << ", baseline=" << baseline_reqs.size() << ")" << "\033[0m" << endl;
         assert(!default_requests[r].empty());
     }
 
@@ -521,6 +600,7 @@ int main(){
                     cerr << "Max path length = " << mx_path_len << "\n";
                     vector<AlgorithmBase*> algorithms;
                     //algorithms.emplace_back(new WernerAlgo_UB(graph,requests,paths));
+                    algorithms.emplace_back(new WernerAlgo3(graph,requests,paths));  // ZFA_UB (LP upper bound with purify)
                     algorithms.emplace_back(new WernerAlgo2(graph,requests,paths));
                     algorithms.emplace_back(new WernerAlgo(graph,requests,paths));
                     if(X_name!="Zmin"&&X_name!="bucket_eps"&&X_name!="time_eta"){
