@@ -62,7 +62,7 @@ vector<SDpair> generate_requests(Graph graph, int requests_cnt, int length_lower
 
     return requests;
 }
-vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 0.85) {
+vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 1) {
     int n = graph.get_num_nodes();
     vector<pair<SDpair,double>> cand[22];
     random_device rd;
