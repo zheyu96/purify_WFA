@@ -451,10 +451,9 @@ void Graph::reserve_shape2(Shape shape, bool enable_purification) {
     }
 }
 double Graph::path_Pr(Path path) {
-    return pow(sqrt(avg_entangle_prob * pow(swapping_succ_prob, 2)), path.size() / 2);
     double Pr = 1;
-    for(int node : path) {
-        Pr *= nodes[node].get_swap_prob();
+    for(int i = 1; i < (int)path.size() - 1; i++) {
+        Pr *= nodes[path[i]].get_swap_prob();
     }
     for(int i = 1; i < (int)path.size(); i++) {
         int node1 = path[i - 1], node2 = path[i];
