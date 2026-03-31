@@ -124,6 +124,137 @@ vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th
     assert((int)requests.size() == requests_cnt);
     return requests;
 }
+// 只生成「必須做 purification 才能通過 fidelity threshold」的 request
+// 原理：對每個 SD pair 的最短路徑，用 Werner domain 計算：
+//   1) 不做 purify 的 end-to-end werner: w_no = Π w_e_i
+//   2) 做 1 round pumping 的 end-to-end werner: w_pur = Π w_e_i^(2)  (Eq. 8)
+//   只保留 w_no < w_th AND w_pur >= w_th 的 pair（purify 的甜蜜點）
+vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, int min_hop = 2) {
+    int n = graph.get_num_nodes();
+    double fid_th = graph.get_fidelity_threshold();
+    double w_th = (4.0 * fid_th - 1.0) / 3.0;
+
+    // BFS 找最短路徑
+    auto bfs_path = [&](int src, int dst) -> vector<int> {
+        vector<int> parent(n, -1);
+        vector<bool> vis(n, false);
+        queue<int> que;
+        vis[src] = true;
+        que.push(src);
+        while (!que.empty()) {
+            int u = que.front(); que.pop();
+            if (u == dst) break;
+            for (int v : graph.adj_list[u]) {
+                if (!vis[v]) {
+                    vis[v] = true;
+                    parent[v] = u;
+                    que.push(v);
+                }
+            }
+        }
+        if (!vis[dst]) return {};
+        vector<int> path;
+        for (int v = dst; v != -1; v = parent[v]) path.push_back(v);
+        reverse(path.begin(), path.end());
+        return path;
+    };
+
+    // Eq.8: 1 round pumping purification
+    auto purified_werner = [](double w_e) -> double {
+        return (3.0*w_e*w_e + 6.0*w_e - 1.0) / (9.0*w_e*w_e - 6.0*w_e + 5.0);
+    };
+
+    // 考慮時間衰退：W-domain 中每個 edge 加上 decoherence
+    double eta = graph.get_tao() / graph.get_time_limit();  // per-slot η in code's convention
+    double kappa = graph.get_n();  // κ
+
+    vector<pair<double, SDpair>> candidates;  // (margin, sd_pair)，margin = w_pur/w_th 越大越好
+
+    for (int i = 0; i < n; i++) {
+        for (int j = i + 1; j < n; j++) {
+            vector<int> path = bfs_path(i, j);
+            if (path.empty()) continue;
+            int h = (int)path.size() - 1;  // hop count
+            if (h < min_hop) continue;
+
+            // 計算不做 purify 的 end-to-end Werner（含 decoherence）
+            // W-domain: W_total = sqrt( Σ (W_e_k + waiting_k * η)^κ ) for κ=2
+            // 簡化：balanced schedule, 每個 leaf 等 ~log2(h) slots
+            double w_no_purify = 1.0;
+            double w_purify = 1.0;
+            for (int k = 1; k <= h; k++) {
+                double w_e = graph.get_link_werner(path[k-1], path[k]);
+                double w_e_pur = purified_werner(w_e);
+                w_no_purify *= w_e;
+                w_purify *= w_e_pur;
+            }
+
+            // 加入 decoherence：balanced schedule 約需 (1+log2(h)) slots（不做 purify）
+            //                   做 purify 約需 (2+log2(h)) slots
+            int slots_no = 1 + (int)ceil(log2(max(h, 1)));
+            int slots_pur = 2 + (int)ceil(log2(max(h, 1)));
+            // W-domain decoherence: w *= exp(-(slots * η)^κ) 近似
+            // 但 η 在 code 中很小，嚴謹做法是用 W-domain 遞迴
+            // 這裡用簡化近似：w_decayed = w * exp(-(slots * eta_raw)^kappa)
+            // 其中 eta_raw = tao（pass_tao 對應的時間量）
+            double tao = graph.get_tao();
+            double T_param = graph.get_T();
+            double n_param = graph.get_n();
+            // 每個 slot 的 Werner decay: w_d(δ) = exp(-(tao/T)^n)
+            double w_decay_per_slot = exp(-pow(tao / T_param, n_param));
+            // 最早建立的 pair 等最久
+            double w_no_decayed = w_no_purify * pow(w_decay_per_slot, slots_no);
+            double w_pur_decayed = w_purify * pow(w_decay_per_slot, slots_pur);
+
+            // 甜蜜點：不做 purify 過不了，做了能過
+            if (w_no_decayed < w_th && w_pur_decayed >= w_th) {
+                double margin = w_pur_decayed / w_th;  // 越大越穩
+                candidates.push_back({margin, {i, j}});
+                candidates.push_back({margin, {j, i}});  // 雙向
+            }
+        }
+    }
+
+    cerr << "\033[1;33m" << "[purify_needed] found " << candidates.size()
+         << " SD pairs in purification sweet spot (w_th=" << w_th
+         << ", fid_th=" << fid_th << ")" << "\033[0m" << endl;
+
+    if (candidates.empty()) {
+        cerr << "\033[1;31m" << "[purify_needed] WARNING: no pairs found! "
+             << "Consider lowering min_fidelity or raising fidelity_threshold or min_hop."
+             << "\033[0m" << endl;
+        return {};
+    }
+
+    // 按 margin 排序（穩定度高的優先），再 shuffle 同 margin 的
+    sort(candidates.begin(), candidates.end(), [](auto &a, auto &b) {
+        return a.first > b.first;
+    });
+
+    random_device rd;
+    default_random_engine gen(rd());
+    vector<SDpair> requests;
+    // 每個 pair 重複 3~6 次，直到達標
+    uniform_int_distribution<int> rep_dist(3, 6);
+    int idx = 0;
+    while ((int)requests.size() < requests_cnt && idx < (int)candidates.size()) {
+        int rep = min(rep_dist(gen), requests_cnt - (int)requests.size());
+        for (int r = 0; r < rep; r++)
+            requests.push_back(candidates[idx].second);
+        idx++;
+    }
+    // 不夠就循環填充
+    idx = 0;
+    while ((int)requests.size() < requests_cnt) {
+        requests.push_back(candidates[idx % candidates.size()].second);
+        idx++;
+    }
+    requests.resize(requests_cnt);
+
+    shuffle(requests.begin(), requests.end(), gen);
+    return requests;
+}
+
 int main(){
     string file_path = "../data/";
 
@@ -198,11 +329,14 @@ int main(){
         }
         Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
         //default_requests[r] = generate_requests(graph, 190, length_lower, length_upper);
-        default_requests[r]=generate_requests_fid(graph,250,0.6,3);
-        //cerr<<"Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;
+        //default_requests[r]=generate_requests_fid(graph,250,0.6,3);
+        // 使用 purify 甜蜜點 request 生成：只保留「不做 purify 過不了、做了就能過」的 SD pair
+        default_requests[r] = generate_requests_purify_needed(graph, 250, 3);
+        if (default_requests[r].empty()) {
+            cerr << "[fallback] purify_needed found no pairs, falling back to generate_requests_fid" << endl;
+            default_requests[r] = generate_requests_fid(graph, 250, 0.6, 3);
+        }
         assert(!default_requests[r].empty());
-        //cerr  << "Generated requests for round " << r << ", cnt: " << default_requests[r].size() << endl;
-        //assert((int)default_requests[r].size()>=190);
     }
 
 
