@@ -344,7 +344,7 @@ void WernerAlgo_time::run() {
                     } else {
                         beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
                     }
-                    obj += (beta[node_id][t] - original) * theta;
+                    obj += (beta[node_id][t] - original) * graph.get_node_memory_at(node_id, t);
                 }
             }
             /* cerr<<"[WernerAlgo] obj :"<<obj<<endl;
