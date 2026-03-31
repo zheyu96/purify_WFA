@@ -124,11 +124,12 @@ vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th
     assert((int)requests.size() == requests_cnt);
     return requests;
 }
-// 只生成「必須做 purification 才能通過 fidelity threshold」的 request
-// 原理：對每個 SD pair 的最短路徑，用 Werner domain 計算：
-//   1) 不做 purify 的 end-to-end werner: w_no = Π w_e_i
-//   2) 做 1 round pumping 的 end-to-end werner: w_pur = Π w_e_i^(2)  (Eq. 8)
-//   只保留 w_no < w_th AND w_pur >= w_th 的 pair（purify 的甜蜜點）
+// 生成「purification 能帶來優勢」的 request
+// 三個優先級（由高到低）：
+//   A) 嚴格甜蜜點：w_no < w_th AND w_pur >= w_th（不做 purify 過不了，做了就能過）
+//   B) 邊緣受益者：w_no 只比 w_th 高一點（< w_th * margin_ratio），purify 後 w_pur 遠高於 w_th
+//      → 這些 pair 不做 purify 勉強過，但 fidelity 很低，做 purify 後 Pr*w 大幅提升
+//   C) 必須 purify 的長 hop（補充用）
 vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, int min_hop = 2) {
     int n = graph.get_num_nodes();
     double fid_th = graph.get_fidelity_threshold();
@@ -168,10 +169,15 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
     double eta = graph.get_tao() / graph.get_time_limit();  // per-slot η in code's convention
     double kappa = graph.get_n();  // κ
 
-    vector<pair<double, SDpair>> candidates;  // (margin, sd_pair)
+    // 邊緣受益者的判定：w_no 超過 w_th 但不超過 margin_ratio 倍
+    // 這些 pair 不做 purify 勉強過，但 fidelity 低，做 purify 後 Pr*w 提升顯著
+    const double margin_ratio = 1.08;  // w_no < w_th * 1.08 就算「邊緣」
+
+    // 優先級：A=嚴格甜蜜點(score 2.0+), B=邊緣受益者(score 1.0+)
+    vector<pair<double, SDpair>> candidates;
 
     // 診斷用
-    struct HopDiag { int total=0, pass_no=0, sweet=0, fail_both=0; double sum_w=0; };
+    struct HopDiag { int total=0, pass_no=0, marginal=0, sweet=0, fail_both=0; double sum_w=0; };
     map<int, HopDiag> diag;
 
     double tao_val = graph.get_tao();
@@ -200,35 +206,47 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
             double w_no_decayed = w_no_purify * pow(w_decay_per_slot, slots_no);
             double w_pur_decayed = w_purify * pow(w_decay_per_slot, slots_pur);
 
-            // 診斷統計
             diag[h].total++;
             diag[h].sum_w += w_no_decayed;
-            if (w_no_decayed >= w_th) {
-                diag[h].pass_no++;
-            } else if (w_pur_decayed >= w_th) {
+
+            if (w_no_decayed < w_th && w_pur_decayed >= w_th) {
+                // A: 嚴格甜蜜點 — 不做 purify 過不了，做了能過
                 diag[h].sweet++;
-                double margin = w_pur_decayed / w_th;
-                candidates.push_back({margin, {i, j}});
-                candidates.push_back({margin, {j, i}});
+                double score = 2.0 + w_pur_decayed / w_th;  // 高優先
+                candidates.push_back({score, {i, j}});
+                candidates.push_back({score, {j, i}});
+            } else if (w_no_decayed >= w_th && w_no_decayed < w_th * margin_ratio
+                       && w_pur_decayed >= w_th) {
+                // B: 邊緣受益者 — 不做 purify 勉強過，但做 purify 後 w 大幅提升
+                //    purify 提升 Pr*w 的幅度 = w_pur / w_no（fidelity 提升比例）
+                diag[h].marginal++;
+                double boost = w_pur_decayed / w_no_decayed;  // purify 帶來的 w 倍率
+                double score = 1.0 + boost / 10.0;  // 低於 A 但有價值
+                candidates.push_back({score, {i, j}});
+                candidates.push_back({score, {j, i}});
+            } else if (w_no_decayed >= w_th * margin_ratio) {
+                diag[h].pass_no++;
             } else {
                 diag[h].fail_both++;
             }
         }
     }
 
-    // 診斷：統計各 hop 數的 w_no 分佈
-    cerr << "\033[1;33m" << "[purify_needed] diagnostics (w_th=" << w_th << "):" << "\033[0m" << endl;
+    // 診斷
+    cerr << "\033[1;33m" << "[purify_needed] diagnostics (w_th=" << w_th
+         << ", margin=" << margin_ratio << "):" << "\033[0m" << endl;
     for (auto &[hop, stats] : diag) {
         cerr << "  hop=" << hop
              << " | pairs=" << stats.total
-             << " | pass_no_purify=" << stats.pass_no
-             << " | need_purify_and_ok=" << stats.sweet
-             << " | fail_even_purify=" << stats.fail_both
+             << " | comfy_pass=" << stats.pass_no
+             << " | marginal(purify_helps)=" << stats.marginal
+             << " | strict_sweet=" << stats.sweet
+             << " | fail_both=" << stats.fail_both
              << " | avg_w_no=" << (stats.total > 0 ? stats.sum_w / stats.total : 0)
              << endl;
     }
-    cerr << "\033[1;33m" << "[purify_needed] found " << candidates.size()
-         << " SD pairs in purification sweet spot" << "\033[0m" << endl;
+    cerr << "\033[1;33m" << "[purify_needed] total candidates=" << candidates.size()
+         << " (strict + marginal)" << "\033[0m" << endl;
 
     if (candidates.empty()) {
         cerr << "\033[1;31m" << "[purify_needed] WARNING: no pairs found! "
