@@ -1,5 +1,5 @@
 #include "../PathMethodBase/PathMethod.h"
-#include "gurobi_c++.h"
+// #include "gurobi_c++.h"  // disabled: Gurobi not available on this system
 
 using namespace std;
 

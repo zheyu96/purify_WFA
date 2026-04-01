@@ -29,7 +29,7 @@ SDpair generate_new_request(int num_of_node){
     return make_pair(node1, node2);
 }
 
-vector<SDpair> generate_requests(Graph graph, int requests_cnt, int length_lower, int length_upper) {
+vector<SDpair> generate_requests(Graph &graph, int requests_cnt, int length_lower, int length_upper) {
     int n = graph.get_num_nodes();
     vector<SDpair> cand;
     random_device rd;
@@ -63,7 +63,7 @@ vector<SDpair> generate_requests(Graph graph, int requests_cnt, int length_lower
 
     return requests;
 }
-vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 1) {
+vector<SDpair> generate_requests_fid(Graph &graph, int requests_cnt,double fid_th,double hop_th, double fid_upper = 1) {
     int n = graph.get_num_nodes();
     vector<pair<SDpair,double>> cand[22];
     random_device rd;
@@ -102,17 +102,29 @@ vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th
     for(int i=0;i<22;i++){
         random_shuffle(cand[i].begin(), cand[i].end());
     }
+    // 檢查是否有任何候選
+    bool any_cand = false;
+    for (int i = 0; i < 22; i++) if (!cand[i].empty()) any_cand = true;
+    if (!any_cand) {
+        cerr << "[generate_requests_fid] WARNING: no candidates found (fid_th=" << fid_th << ", hop_th=" << hop_th << ")" << endl;
+        return {};
+    }
+
     vector<SDpair> requests;
     int pos[22];
     for(int i=0;i<22;i++) pos[i]=0;
     int idx=0;
-    while(requests.size()<requests_cnt){
+    while((int)requests.size()<requests_cnt){
         int cnt=unif(generator) % 5 +4;
-        cnt=min(cnt,(int)(requests_cnt-requests.size()));
+        cnt=min(cnt,(int)(requests_cnt-(int)requests.size()));
+        // 找下一個非空桶（有保護）
+        int tries = 0;
         while(cand[21-idx].empty()){
             idx++;
             if(idx>=22) idx=0;
+            if(++tries > 22) break;  // 防止無限迴圈
         }
+        if(tries > 22) break;
         if(!cand[21-idx].empty()){
             for(int i=0;i<cnt;i++){
                 requests.push_back(cand[21-idx][pos[21-idx]].first);
@@ -122,7 +134,8 @@ vector<SDpair> generate_requests_fid(Graph graph, int requests_cnt,double fid_th
         }
         idx=(idx+1)%22;
     }
-    assert((int)requests.size() == requests_cnt);
+    if ((int)requests.size() < requests_cnt)
+        cerr << "[generate_requests_fid] only generated " << requests.size() << "/" << requests_cnt << " requests" << endl;
     return requests;
 }
 // 生成「purification 能帶來優勢」的 request

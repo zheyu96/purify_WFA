@@ -21,9 +21,10 @@ routing = Network/PathMethod/PathMethodBase/PathMethod.o Network/PathMethod/Gree
 # 編譯旗標
 gcc_flag = -g -Wall -Wextra -Os -Ofast --std=c++17
 
-# Gurobi 設定 (請確認路徑與您的環境一致)
-gurobi_path = /home/oba/danger/gurobi951/linux64
-gurobi_flag = -I$(gurobi_path)/include/ -L$(gurobi_path)/lib/ -lgurobi_c++ -lgurobi95
+# Gurobi 設定 (如果沒有安裝 Gurobi，留空即可，REPS 會編譯失敗但不影響主程式)
+# gurobi_path = /home/oba/danger/gurobi951/linux64
+# gurobi_flag = -I$(gurobi_path)/include/ -L$(gurobi_path)/lib/ -lgurobi_c++ -lgurobi95
+gurobi_flag =
 
 # --- 主要執行目標 ---
 

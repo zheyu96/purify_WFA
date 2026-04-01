@@ -305,9 +305,11 @@ void WernerAlgo3::run() {
         variable_initialize();
         int it=0;
         double eps=1e-4;
+        cerr << "[" << algorithm_name << "] LP phase start, requests=" << requests.size() << endl;
         while (obj+eps < 1.0) {
+            it++;
             Shape_vector shape=separation_oracle();
-            if (shape.empty()) break;
+            if (shape.empty()) { cerr << "[" << algorithm_name << "] iter " << it << ": oracle returned empty, stop" << endl; break; }
             vector<int> cur_purify_rounds;
             if(shape_purify_map.count(shape))
                 cur_purify_rounds = shape_purify_map[shape];
@@ -354,6 +356,17 @@ void WernerAlgo3::run() {
             }
             if(req_idx==-1) break;
             x[req_idx][shape]+=q;
+            // 每 10 輪印一次進度
+            if (it % 10 == 1) {
+                int src=shape.front().first, dst=shape.back().first;
+                cerr << "[" << algorithm_name << "] iter " << it
+                     << " | obj=" << (double)obj
+                     << " | q=" << (double)q
+                     << " | req=(" << src << "," << dst << ")"
+                     << " | hops=" << (shape.size()-1)
+                     << " | x_shapes=" << x[req_idx].size()
+                     << endl;
+            }
             double ori=alpha[req_idx];
             alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
             obj+=(alpha[req_idx]-ori);
@@ -371,14 +384,14 @@ void WernerAlgo3::run() {
         }
 
         // === LP Upper Bound 計算（不做 greedy rounding）===
-        // 從 fractional solution x[i][shape] 直接計算 LP 目標值上界
-        // 目標式 (Eq. 14a): max Σ Pr(i,p,m) · w(i,p,m) · x_m^ip
+        cerr << "[" << algorithm_name << "] LP phase done after " << it << " iters, obj=" << (double)obj << endl;
+        cerr << "[" << algorithm_name << "] computing LP upper bound from fractional solution..." << endl;
+        int ub_shape_cnt = 0;
         for(int i = 0; i < (int)requests.size(); i++) {
             for(auto& P : x[i]) {
-                double xval = P.second;  // fractional weight
+                double xval = P.second;
                 if(xval < 1e-12) continue;
 
-                // 用 purify_rounds 構造 Shape
                 vector<int> pr;
                 if(shape_purify_map.count(P.first))
                     pr = shape_purify_map[P.first];
@@ -393,8 +406,12 @@ void WernerAlgo3::run() {
                 // LP 上界：x_val * Pr * w
                 res["fidelity_gain"] += xval * (werner * prob);
                 res["succ_request_cnt"] += xval * prob;
+                ub_shape_cnt++;
             }
         }
+        cerr << "[" << algorithm_name << "] UB result: fidelity_gain=" << (double)res["fidelity_gain"]
+             << ", succ_req=" << (double)res["succ_request_cnt"]
+             << ", shapes_counted=" << ub_shape_cnt << endl;
     }
     cerr << "[" << algorithm_name << "] end" << endl;
 }
