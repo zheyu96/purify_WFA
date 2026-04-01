@@ -411,12 +411,12 @@ int main(){
         // 混合生成：purify 甜蜜點為主(70%)，baseline 為輔(30%)
         // 關鍵：交錯排列，確保任何前綴（request_cnt=10,30,...）都有均勻的 hop 分佈
         int total_cnt = 250;
-        int purify_cnt = (int)(total_cnt * 0.7);
+        int purify_cnt = total_cnt;
         int baseline_cnt = total_cnt - purify_cnt;
 
         // min_hop=2：包含 2-hop 的 purify request
         auto purify_reqs = generate_requests_purify_needed(graph, purify_cnt, 2);
-        auto baseline_reqs = generate_requests_fid(graph, baseline_cnt, fidelity_threshold + 0.01, 2);
+        auto baseline_reqs = generate_requests_fid(graph, baseline_cnt, 0.85, 2);
 
         if (purify_reqs.empty()) {
             cerr << "[fallback] purify_needed found no pairs, using all baseline" << endl;
@@ -426,7 +426,7 @@ int main(){
             // 這樣任何前綴都有 ~70% purify + ~30% baseline 的比例
             default_requests[r].clear();
             int pi = 0, bi = 0;
-            int purify_per_cycle = 2;  // 每個 cycle 放 2 個 purify + 1 個 baseline ≈ 67% purify
+            int purify_per_cycle = 4;  // 每個 cycle 放 4 個 purify + 1 個 baseline ≈ 67% purify
             while ((int)default_requests[r].size() < total_cnt) {
                 // 放 purify_per_cycle 個 purify request
                 for (int k = 0; k < purify_per_cycle && (int)default_requests[r].size() < total_cnt; k++) {
