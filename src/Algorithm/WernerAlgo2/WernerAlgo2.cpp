@@ -410,8 +410,10 @@ void WernerAlgo2::run() {
 
         vector<bool> used(requests.size(), false);
         vector<int> finished;
-        
-        // [新增] 統計資料結構：Key=Duration, Value=List of {W_raw, W_new}
+
+        // [診斷] 統計 rounding 結果
+        int round_total = 0, round_purified = 0, round_nopurify = 0;
+        int round_fail_fid = 0, round_fail_mem = 0, round_fail_purify_mem = 0;
         map<int, vector<pair<double, double>>> purification_stats;
 
         for(pair<double, Shape_vector> P : shapes) {
@@ -420,6 +422,8 @@ void WernerAlgo2::run() {
             if(shape_purify_map.count(P.second))
                 pr = shape_purify_map[P.second];
             Shape shape = pr.empty() ? Shape(P.second) : Shape(P.second, pr);
+            bool has_purify = false;
+            for (int r : pr) if (r > 0) has_purify = true;
             int request_index = -1;
             for(int i = 0; i < (int)requests.size(); i++) {
                 if(used[i] == false && requests[i] == make_pair(shape.get_node_mem_range().front().first, shape.get_node_mem_range().back().first)) {
@@ -428,11 +432,19 @@ void WernerAlgo2::run() {
             }
 
             if(request_index == -1 || used[request_index]) continue;
-            
+            round_total++;
+
             // 檢查資源：先用標準 check_resource 檢查 fidelity 和基本 memory，
             // 再額外檢查 purification 的真實 memory 需求
             bool resource_ok = false;
-            if(graph.check_resource(shape, true, true)) {
+            bool fid_check = graph.check_resource(shape, true, true);
+            if(!fid_check) {
+                // 診斷：是 fidelity 還是 memory 問題？
+                bool mem_only = graph.check_resource(shape, false, true);
+                if(!mem_only) round_fail_mem++;
+                else round_fail_fid++;
+            }
+            if(fid_check) {
                 resource_ok = true;
                 // 計算含 purification 的每 (node, timeslot) 總 memory 需求
                 Shape_vector sv_chk = shape.get_node_mem_range();
@@ -470,8 +482,10 @@ void WernerAlgo2::run() {
                         resource_ok = false;
                 }
             }
+            if(!resource_ok && fid_check) round_fail_purify_mem++;  // fidelity ok 但 purify memory 不夠
             if(resource_ok) {
                 used[request_index] = true;
+                if(has_purify) round_purified++; else round_nopurify++;
                 graph.reserve_shape(shape, true);
                 // 額外扣除 purification 多消耗的 memory（標準 Shape 已扣 1，這裡補扣剩餘）
                 // index 需反向對應 gen_leaf_label
@@ -515,6 +529,17 @@ void WernerAlgo2::run() {
                 }
             }
         }
+
+        // [診斷] 印出 rounding 統計
+        cerr << "\033[1;35m" << "[" << algorithm_name << " rounding] "
+             << "candidates=" << round_total
+             << " | accepted_purified=" << round_purified
+             << " | accepted_nopurify=" << round_nopurify
+             << " | fail_fidelity=" << round_fail_fid
+             << " | fail_base_mem=" << round_fail_mem
+             << " | fail_purify_extra_mem=" << round_fail_purify_mem
+             << " | purify_map_size=" << shape_purify_map.size()
+             << "\033[0m" << endl;
 
         sort(finished.rbegin(), finished.rend());
         for(auto fin : finished) {
