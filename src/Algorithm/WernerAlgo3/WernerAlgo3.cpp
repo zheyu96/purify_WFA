@@ -383,35 +383,44 @@ void WernerAlgo3::run() {
             }
         }
 
-        // === LP Upper Bound 計算（不做 greedy rounding）===
-        cerr << "[" << algorithm_name << "] LP phase done after " << it << " iters, obj=" << (double)obj << endl;
-        cerr << "[" << algorithm_name << "] computing LP upper bound from fractional solution..." << endl;
-        int ub_shape_cnt = 0;
+        // === LP Upper Bound（論文 Eq. 14a-14d）===
+        // Eq.14a: max Σ_{i,p,m} Pr(i,p,m) · w(i,p,m) · x_m^ip
+        // Eq.14b: Σ_{p,m} x_m^ip ≤ 1, ∀i ∈ I
+        // Garg-Konemann 累積的 x 可能違反 14b（Σ x > 1），需 per-request 正規化
+        cerr << "[" << algorithm_name << "] LP done, " << it << " iters, obj=" << (double)obj << endl;
+        int ub_cnt = 0;
+        double max_xsum = 0;
         for(int i = 0; i < (int)requests.size(); i++) {
-            for(auto& P : x[i]) {
-                double xval = P.second;
-                if(xval < 1e-12) continue;
+            if(x[i].empty()) continue;
+            // 計算此 request 的 Σ x_m^ip
+            double xsum = 0;
+            for(auto& P : x[i]) xsum += P.second;
+            if(xsum < 1e-12) continue;
+            max_xsum = max(max_xsum, (double)xsum);
+            // Eq.14b 正規化: scale down 使 Σ x ≤ 1
+            double scale = (xsum > 1.0L) ? (1.0L / xsum) : 1.0L;
 
+            for(auto& P : x[i]) {
+                double xval = P.second * scale;
+                if(xval < 1e-12) continue;
                 vector<int> pr;
                 if(shape_purify_map.count(P.first))
                     pr = shape_purify_map[P.first];
                 Shape shape = pr.empty() ? Shape(P.first) : Shape(P.first, pr);
-
                 double fidelity = shape.get_fidelity(A, B, n, T, tao, graph.get_F_init(), true);
                 if(fidelity + EPS < graph.get_fidelity_threshold()) continue;
-
-                double prob = graph.path_Pr_purify(shape);
-                double werner = (4.0L * fidelity - 1.0L) / 3.0L;
-
-                // LP 上界：x_val * Pr * w
-                res["fidelity_gain"] += xval * (werner * prob);
-                res["succ_request_cnt"] += xval * prob;
-                ub_shape_cnt++;
+                // Eq.14a: Pr(i,p,m) · w(i,p,m) · x_m^ip
+                double Pr = graph.path_Pr_purify(shape);
+                double w = (4.0L * fidelity - 1.0L) / 3.0L;
+                res["fidelity_gain"] += xval * Pr * w;
+                res["succ_request_cnt"] += xval * Pr;
+                ub_cnt++;
             }
         }
-        cerr << "[" << algorithm_name << "] UB result: fidelity_gain=" << (double)res["fidelity_gain"]
-             << ", succ_req=" << (double)res["succ_request_cnt"]
-             << ", shapes_counted=" << ub_shape_cnt << endl;
+        cerr << "[" << algorithm_name << "] UB(Eq.14a): fid_gain=" << (double)res["fidelity_gain"]
+             << " succ_req=" << (double)res["succ_request_cnt"]
+             << " shapes=" << ub_cnt
+             << " max_xsum=" << max_xsum << endl;
     }
     cerr << "[" << algorithm_name << "] end" << endl;
 }

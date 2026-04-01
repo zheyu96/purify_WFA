@@ -53,7 +53,7 @@ private:
         double eps_bucket,Zhat,Zmin,eta,T,deltaP;
         int tau_max;
     }dpp;
-    double epsilon = 0.35;
+    double epsilon = 0.5;
     double obj = 0.0;
     vector<double> alpha;
     vector<vector<double>> beta;
