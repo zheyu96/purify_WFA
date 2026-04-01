@@ -415,7 +415,7 @@ int main(){
         int baseline_cnt = total_cnt - purify_cnt;
 
         // min_hop=2：包含 2-hop 的 purify request
-        auto purify_reqs = generate_requests_purify_needed(graph, purify_cnt, 2);
+        auto purify_reqs = generate_requests_purify_needed(graph, purify_cnt*0.8, 2);
         auto baseline_reqs = generate_requests_fid(graph, baseline_cnt, 0.85, 2);
 
         if (purify_reqs.empty()) {
