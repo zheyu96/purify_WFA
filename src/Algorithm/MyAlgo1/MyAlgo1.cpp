@@ -32,7 +32,6 @@ void MyAlgo1::variable_initialize() {
         }
     }
 }
-
 Shape_vector MyAlgo1::separation_oracle() {
     Shape_vector min_shape;
     double min_value = INF;

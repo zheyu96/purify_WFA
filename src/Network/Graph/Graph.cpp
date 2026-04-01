@@ -34,7 +34,6 @@ Graph::Graph(string filename, int _time_limit, double _swap_prob, int avg_memory
         memory_rand += avg_memory;
         nodes.push_back(Node(id, memory_rand, time_limit, swap_prob));
     }
-    
     int num_edges;
     graph_file >> num_edges;
     avg_entangle_prob = 0;
