@@ -109,31 +109,25 @@ double Shape::pass_tao(double F) {
 
 void Shape::check_valid() {
     if(node_mem_range[0].second.size() != 1) {
-        cerr << "the usage of memory at src should be 1, but " << node_mem_range[0].second.size() << endl;
-        exit(1);
+        throw runtime_error("the usage of memory at src should be 1, but " + to_string(node_mem_range[0].second.size()));
     }
     if(node_mem_range.back().second.size() != 1) {
-        cerr << "the usage of memory at dst should be 1, but " << node_mem_range.back().second.size() << endl;
-        exit(1);
+        throw runtime_error("the usage of memory at dst should be 1, but " + to_string(node_mem_range.back().second.size()));
     }
     for(int i = 1; i < (int)node_mem_range.size() - 1; i++) {
         int node_id = node_mem_range[i].first;
         vector<pair<int, int>> memory_range = node_mem_range[i].second;
         if(memory_range.size() != 2) {
-            cerr << "node " << node_id << endl;
-            cerr << "the usage of memory at med node should be 2, but " << memory_range.size() << endl;
-            exit(1);
+            throw runtime_error("node " + to_string(node_id) + " med node memory should be 2, but " + to_string(memory_range.size()));
         }
-        
-        // memory_range[[0]and memory_range[[1]
+
         if(memory_range.front().second != memory_range[1].second) {
-            cerr << "two range should finish same time (after swap)" << endl;
-            exit(1);
+            throw runtime_error("two range should finish same time (after swap)");
         }
-        assert(memory_range[0].first >= 0);
-        assert(memory_range[1].first >= 0);
-        assert(memory_range[0].first <= memory_range[0].second);
-        assert(memory_range[1].first <= memory_range[1].second);
+        if(memory_range[0].first < 0 || memory_range[1].first < 0 ||
+           memory_range[0].first > memory_range[0].second || memory_range[1].first > memory_range[1].second) {
+            throw runtime_error("invalid memory range for node " + to_string(node_id));
+        }
     }
 
     recursion_check(0, node_mem_range.size() - 1);
@@ -145,9 +139,8 @@ void Shape::recursion_check(int left, int right) {
         int left_end = node_mem_range[left].second.back().second;
         int right_start = node_mem_range[right].second.front().first;
         int right_end = node_mem_range[right].second.front().second;
-        assert(left_start == right_start);
-        assert(left_end - 1 >= left_start);
-        assert(right_end - 1 >= right_start);
+        if(left_start != right_start || left_end - 1 < left_start || right_end - 1 < right_start)
+            throw runtime_error("leaf timing invalid");
         return;
     }
 
@@ -164,16 +157,12 @@ void Shape::recursion_check(int left, int right) {
     int right_finish_time = node_mem_range[right].second.front().second;
     int right_start_time = node_mem_range[right].second.front().first;
     if(latest_finish_time >= left_finish_time || latest_finish_time >= right_finish_time) {
-        cerr << "swap time error, swap after finish" << endl;
-        cerr << "swap time = " << latest_finish_time << endl;
-        cerr << "left fin = " << left_finish_time << endl;
-        cerr << "right fin = " << right_finish_time << endl;
-        exit(1);
+        throw runtime_error("swap time error: swap_t=" + to_string(latest_finish_time)
+            + " left_fin=" + to_string(left_finish_time) + " right_fin=" + to_string(right_finish_time));
     }
 
     if(latest_finish_time < left_start_time || latest_finish_time < right_start_time) {
-        cerr << "swap time error, swap before entangle" << endl;
-        exit(1);
+        throw runtime_error("swap before entangle");
     }
 
     recursion_check(left, latest);

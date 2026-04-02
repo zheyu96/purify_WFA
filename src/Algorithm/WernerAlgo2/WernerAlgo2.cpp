@@ -434,15 +434,22 @@ void WernerAlgo2::run() {
             if(request_index == -1 || used[request_index]) continue;
             round_total++;
 
-            // 檢查資源：先用標準 check_resource 檢查 fidelity 和基本 memory，
-            // 再額外檢查 purification 的真實 memory 需求
+            // 檢查資源（check_valid 可能 throw，用 try-catch 保護）
             bool resource_ok = false;
-            bool fid_check = graph.check_resource(shape, true, true);
+            bool fid_check = false;
+            try {
+                fid_check = graph.check_resource(shape, true, true);
+            } catch(const runtime_error&) {
+                fid_check = false;  // shape 不合法
+            }
             if(!fid_check) {
-                // 診斷：是 fidelity 還是 memory 問題？
-                bool mem_only = graph.check_resource(shape, false, true);
-                if(!mem_only) round_fail_mem++;
-                else round_fail_fid++;
+                try {
+                    bool mem_only = graph.check_resource(shape, false, true);
+                    if(!mem_only) round_fail_mem++;
+                    else round_fail_fid++;
+                } catch(const runtime_error&) {
+                    round_fail_fid++;
+                }
             }
             if(fid_check) {
                 resource_ok = true;

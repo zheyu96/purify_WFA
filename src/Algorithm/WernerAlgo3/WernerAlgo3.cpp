@@ -407,9 +407,13 @@ void WernerAlgo3::run() {
                 if(shape_purify_map.count(P.first))
                     pr = shape_purify_map[P.first];
                 Shape shape = pr.empty() ? Shape(P.first) : Shape(P.first, pr);
-                double fidelity = shape.get_fidelity(A, B, n, T, tao, graph.get_F_init(), true);
+                double fidelity;
+                try {
+                    fidelity = shape.get_fidelity(A, B, n, T, tao, graph.get_F_init(), true);
+                } catch(const runtime_error&) {
+                    continue;  // shape timing 不合法，跳過
+                }
                 if(fidelity + EPS < graph.get_fidelity_threshold()) continue;
-                // Eq.14a: Pr(i,p,m) · w(i,p,m) · x_m^ip
                 double Pr = graph.path_Pr_purify(shape);
                 double w = (4.0L * fidelity - 1.0L) / 3.0L;
                 res["fidelity_gain"] += xval * Pr * w;
