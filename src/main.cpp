@@ -362,7 +362,7 @@ int main(){
     default_setting["num_nodes"] = 100;
     default_setting["request_cnt"] = 50;
     default_setting["entangle_lambda"] = 0.045;
-    default_setting["time_limit"] = 20;
+    default_setting["time_limit"] = 15;
     // avg_memory 降低使資源稍緊張：不同演算法的資源分配策略差異才會體現
     // 20: 太寬裕 → 大家一樣。8: 適度緊張 → MyAlgo1/MyAlgo3 有小幅差距
     // ZFA2 靠 purify 能接更多 request，仍然領先
