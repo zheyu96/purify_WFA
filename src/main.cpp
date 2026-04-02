@@ -139,15 +139,14 @@ vector<SDpair> generate_requests_fid(Graph &graph, int requests_cnt,double fid_t
     return requests;
 }
 // 生成「purification 能帶來優勢」的 request
-// 三個優先級（由高到低）：
-//   A) 嚴格甜蜜點：w_no < w_th AND w_pur >= w_th（不做 purify 過不了，做了就能過）
-//   B) 邊緣受益者：w_no 只比 w_th 高一點（< w_th * margin_ratio），purify 後 w_pur 遠高於 w_th
-//      → 這些 pair 不做 purify 勉強過，但 fidelity 很低，做 purify 後 Pr*w 大幅提升
-//   C) 必須 purify 的長 hop（補充用）
+// 用 Shape::get_fidelity 精確計算（和 rounding 階段的 check_resource 完全一致）
+// 構造一個最簡單的 balanced-tree shape，分別算有/無 purify 的 real fidelity
 vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, int min_hop = 2) {
     int n = graph.get_num_nodes();
     double fid_th = graph.get_fidelity_threshold();
-    double w_th = (4.0 * fid_th - 1.0) / 3.0;
+    double A = graph.get_A(), B = graph.get_B();
+    double n_param = graph.get_n(), T = graph.get_T(), tao = graph.get_tao();
+    auto F_init = graph.get_F_init();
 
     // BFS 找最短路徑
     auto bfs_path = [&](int src, int dst) -> vector<int> {
@@ -174,37 +173,35 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
         return path;
     };
 
-    // Eq.8: r rounds pumping purification
-    auto purified_werner = [](double w_e, int rounds) -> double {
-        double w_cur = w_e;
-        for (int r = 0; r < rounds; r++) {
-            w_cur = (3.0*w_cur*w_e + 3.0*w_cur + 3.0*w_e - 1.0)
-                  / (9.0*w_cur*w_e - 3.0*w_cur - 3.0*w_e + 5.0);
+    // 給一條 path 構造一個 balanced-tree shape（最簡單的 schedule）
+    // 回傳 Shape_vector：每個 node 的 memory 佔用時間範圍
+    auto build_balanced_shape = [&](const vector<int>& path) -> Shape_vector {
+        int h = (int)path.size() - 1;
+        // 用簡單的 left-to-right schedule：
+        // 所有 edge 在 t=0 開始 entangle，t=1 完成
+        // swap 按 balanced tree 順序進行
+        // 總時間 ≈ 1 + ceil(log2(h))
+        int total_time = 1 + (int)ceil(log2(max(h, 1)));
+
+        Shape_vector sv;
+        // src: 只有左邊的 link
+        sv.push_back({path[0], {{0, total_time}}});
+        // 中間節點: 左右各一個 link
+        for (int k = 1; k < h; k++) {
+            sv.push_back({path[k], {{0, total_time}, {0, total_time}}});
         }
-        return w_cur;
+        // dst: 只有右邊的 link
+        sv.push_back({path[h], {{0, total_time}}});
+        return sv;
     };
 
-    // 考慮時間衰退：W-domain 中每個 edge 加上 decoherence
-    double eta = graph.get_tao() / graph.get_time_limit();  // per-slot η in code's convention
-    double kappa = graph.get_n();  // κ
+    const double margin_ratio = 1.05;  // fidelity 超過 threshold 但不超過 5% 算「邊緣」
+    const int max_purify_rounds = 3;
 
-    // 邊緣受益者的判定：w_no 超過 w_th 但不超過 margin_ratio 倍
-    // 這些 pair 不做 purify 勉強過，但 fidelity 低，做 purify 後 Pr*w 提升顯著
-    const double margin_ratio = 1.08;  // w_no < w_th * 1.08 就算「邊緣」
-
-    // 優先級：A=嚴格甜蜜點(score 2.0+), B=邊緣受益者(score 1.0+)
     vector<pair<double, SDpair>> candidates;
 
-    // 診斷用
-    struct HopDiag { int total=0, pass_no=0, marginal=0, sweet=0, fail_both=0; double sum_w=0; };
+    struct HopDiag { int total=0, pass_no=0, marginal=0, sweet=0, fail_both=0; };
     map<int, HopDiag> diag;
-
-    double tao_val = graph.get_tao();
-    double T_param = graph.get_T();
-    double n_param = graph.get_n();
-    double w_decay_per_slot = exp(-pow(tao_val / T_param, n_param));
-
-    const int max_purify_rounds = 3;  // 最多考慮 3 rounds purification
 
     for (int i = 0; i < n; i++) {
         for (int j = i + 1; j < n; j++) {
@@ -213,52 +210,41 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
             int h = (int)path.size() - 1;
             if (h < min_hop) continue;
 
-            // 收集每條 edge 的 w_e
-            vector<double> w_edges(h);
-            double w_no_purify = 1.0;
-            for (int k = 0; k < h; k++) {
-                w_edges[k] = graph.get_link_werner(path[k], path[k+1]);
-                w_no_purify *= w_edges[k];
-            }
+            Shape_vector sv = build_balanced_shape(path);
 
-            int slots_no = 1 + (int)ceil(log2(max(h, 1)));
-            double w_no_decayed = w_no_purify * pow(w_decay_per_slot, slots_no);
+            // 不做 purify 的真實 fidelity
+            Shape shape_no(sv);
+            double fid_no = shape_no.get_fidelity(A, B, n_param, T, tao, F_init, false);
 
-            diag[h].total++;
-            diag[h].sum_w += w_no_decayed;
-
-            // 嘗試 1, 2, 3 rounds purification，找最少 rounds 就能過 threshold 的
+            // 嘗試 1~3 rounds purification
             int best_rounds = -1;
-            double best_w_pur = 0;
+            double fid_pur = 0;
             for (int rr = 1; rr <= max_purify_rounds; rr++) {
-                double w_pur = 1.0;
-                for (int k = 0; k < h; k++)
-                    w_pur *= purified_werner(w_edges[k], rr);
-                int slots_pur = (1 + rr) + (int)ceil(log2(max(h, 1)));
-                double w_pur_decayed = w_pur * pow(w_decay_per_slot, slots_pur);
-                if (w_pur_decayed >= w_th) {
+                vector<int> purify_rounds(h, rr);  // 每條 edge 都做 rr 輪
+                Shape shape_pur(sv, purify_rounds);
+                double f = shape_pur.get_fidelity(A, B, n_param, T, tao, F_init, true);
+                if (f >= fid_th) {
                     best_rounds = rr;
-                    best_w_pur = w_pur_decayed;
-                    break;  // 用最少 rounds 就行
+                    fid_pur = f;
+                    break;
                 }
             }
 
-            if (w_no_decayed < w_th && best_rounds > 0) {
-                // A: 嚴格甜蜜點 — 不做 purify 過不了，做 best_rounds 輪能過
+            diag[h].total++;
+
+            if (fid_no < fid_th && best_rounds > 0) {
+                // A: 嚴格甜蜜點 — 不做 purify 過不了，做了能過
                 diag[h].sweet++;
-                // score: rounds 少的優先（資源省），同 rounds 內 margin 大的優先
-                double score = 3.0 - best_rounds * 0.3 + best_w_pur / w_th * 0.1;
+                double score = 3.0 - best_rounds * 0.3 + fid_pur / fid_th * 0.1;
                 candidates.push_back({score, {i, j}});
                 candidates.push_back({score, {j, i}});
-            } else if (w_no_decayed >= w_th && w_no_decayed < w_th * margin_ratio
-                       && best_rounds > 0) {
-                // B: 邊緣受益者
+            } else if (fid_no >= fid_th && fid_no < fid_th * margin_ratio && best_rounds > 0) {
+                // B: 邊緣受益者 — 不做 purify 勉強過，做 purify 後明顯更好
                 diag[h].marginal++;
-                double boost = best_w_pur / w_no_decayed;
-                double score = 1.0 + boost / 10.0;
+                double score = 1.0 + fid_pur / fid_no * 0.1;
                 candidates.push_back({score, {i, j}});
                 candidates.push_back({score, {j, i}});
-            } else if (w_no_decayed >= w_th * margin_ratio) {
+            } else if (fid_no >= fid_th * margin_ratio) {
                 diag[h].pass_no++;
             } else {
                 diag[h].fail_both++;
@@ -267,7 +253,7 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
     }
 
     // 診斷
-    cerr << "\033[1;33m" << "[purify_needed] diagnostics (w_th=" << w_th
+    cerr << "\033[1;33m" << "[purify_needed] diagnostics (fid_th=" << fid_th
          << ", margin=" << margin_ratio << ", max_rounds=" << max_purify_rounds << "):" << "\033[0m" << endl;
     for (auto &[hop, stats] : diag) {
         cerr << "  hop=" << hop
@@ -276,7 +262,6 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
              << " | marginal=" << stats.marginal
              << " | strict_sweet=" << stats.sweet
              << " | fail_both=" << stats.fail_both
-             << " | avg_w_no=" << (stats.total > 0 ? stats.sum_w / stats.total : 0)
              << endl;
     }
     cerr << "\033[1;33m" << "[purify_needed] total candidates=" << candidates.size()
@@ -362,7 +347,10 @@ int main(){
     default_setting["min_fidelity"] = 0.78;
     default_setting["max_fidelity"] = 0.93;
     default_setting["swap_prob"] = 0.9;
-    default_setting["fidelity_threshold"] = 0.75;
+    // threshold 提高到 0.85：讓 3-4 hop 的最短路徑 fidelity 剛好不夠
+    // 此時 initial_fid ~0.77-0.85，經過 decoherence 後 real_fidelity < 0.85
+    // purification 可以把 fidelity 從 ~0.82 拉到 ~0.90，超過 threshold
+    default_setting["fidelity_threshold"] = 0.85;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
     default_setting["Zmin"]=0.02702867239;
