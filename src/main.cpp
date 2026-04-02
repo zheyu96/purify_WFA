@@ -115,7 +115,7 @@ vector<SDpair> generate_requests_fid(Graph &graph, int requests_cnt,double fid_t
     for(int i=0;i<22;i++) pos[i]=0;
     int idx=0;
     while((int)requests.size()<requests_cnt){
-        int cnt=unif(generator) % 5 +4;
+        int cnt=unif(generator) % 5 +7;
         cnt=min(cnt,(int)(requests_cnt-(int)requests.size()));
         // 找下一個非空桶（有保護）
         int tries = 0;
@@ -326,7 +326,7 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
     // Round-robin：輪流從每個 hop 桶取，每次取 2~4 個同 SD pair
     vector<SDpair> requests;
     vector<int> pos(buckets_vec.size(), 0);
-    uniform_int_distribution<int> rep_dist(2, 4);
+    uniform_int_distribution<int> rep_dist(5, 8);
     int bucket_idx = 0;
     while ((int)requests.size() < requests_cnt) {
         // 找到一個還有 pair 的桶
