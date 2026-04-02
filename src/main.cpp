@@ -385,7 +385,7 @@ int main(){
     default_setting["hop_count"]=3;
     default_setting["delta_P"]=0.0001;
     map<string, vector<double>> change_parameter;
-    change_parameter["request_cnt"] = {30,40,50,60,70,80,90,100};
+    change_parameter["request_cnt"] = {10,20,30,40,50,60,70,80,90,100};
     change_parameter["num_nodes"] = {30, 40, 50, 60, 70};
     change_parameter["min_fidelity"] = {0.6, 0.7, 0.8, 0.9, 0.95};
     change_parameter["avg_memory"] = {4, 6, 8, 10, 12, 16, 20};
