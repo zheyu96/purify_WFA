@@ -173,26 +173,50 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
         return path;
     };
 
-    // 給一條 path 構造一個 balanced-tree shape（最簡單的 schedule）
-    // 回傳 Shape_vector：每個 node 的 memory 佔用時間範圍
-    auto build_balanced_shape = [&](const vector<int>& path) -> Shape_vector {
-        int h = (int)path.size() - 1;
-        // 用簡單的 left-to-right schedule：
-        // 所有 edge 在 t=0 開始 entangle，t=1 完成
-        // swap 按 balanced tree 順序進行
-        // 總時間 ≈ 1 + ceil(log2(h))
-        int total_time = 1 + (int)ceil(log2(max(h, 1)));
+    // 用和 Shape::get_fidelity 完全相同的公式直接計算 path fidelity
+    // F = A + B*exp(-(t/T)^n), decoherence 用 pass_tao
+    auto t2F = [&](double t) -> double {
+        if(t >= 1e5) return 0;
+        return A + B * exp(-pow(t / T, n_param));
+    };
+    auto F2t = [&](double F) -> double {
+        if(F <= A + 1e-9) return 1e9;
+        return T * pow(-log((F - A) / B), 1.0 / n_param);
+    };
+    auto pass_tao_f = [&](double F) -> double {
+        return t2F(F2t(F) + tao);
+    };
+    auto Fswap = [&](double Fa, double Fb) -> double {
+        if(Fa <= A + 1e-9 || Fb <= A + 1e-9) return 0;
+        return Fa * Fb + (1.0 / 3.0) * (1.0 - Fa) * (1.0 - Fb);
+    };
 
-        Shape_vector sv;
-        // src: 只有左邊的 link
-        sv.push_back({path[0], {{0, total_time}}});
-        // 中間節點: 左右各一個 link
-        for (int k = 1; k < h; k++) {
-            sv.push_back({path[k], {{0, total_time}, {0, total_time}}});
+    // 遞迴計算 balanced-tree schedule 的 end-to-end fidelity
+    // edges[i] = F_init of edge i, purify_rounds[i] = rounds for edge i (0=none)
+    function<double(int, int, const vector<double>&, const vector<int>&)> calc_fidelity;
+    calc_fidelity = [&](int left, int right, const vector<double>& edge_fids, const vector<int>& pur_rounds) -> double {
+        if (left == right - 1) {
+            // Leaf: single edge
+            double raw_f = edge_fids[left];
+            int rounds = pur_rounds[left];
+            if (rounds > 0) {
+                double w_e = (4.0 * raw_f - 1.0) / 3.0;
+                double w_cur = w_e;
+                for (int r = 0; r < rounds; r++) {
+                    w_cur = (3.0*w_cur*w_e + 3.0*w_cur + 3.0*w_e - 1.0)
+                          / (9.0*w_cur*w_e - 3.0*w_cur - 3.0*w_e + 5.0);
+                }
+                return pass_tao_f((3.0 * w_cur + 1.0) / 4.0);
+            }
+            return pass_tao_f(raw_f);
         }
-        // dst: 只有右邊的 link
-        sv.push_back({path[h], {{0, total_time}}});
-        return sv;
+        // Balanced split
+        int mid = (left + right) / 2;
+        double Fa = calc_fidelity(left, mid, edge_fids, pur_rounds);
+        double Fb = calc_fidelity(mid, right, edge_fids, pur_rounds);
+        // Swap + 1 tao decoherence
+        return t2F(F2t(Fswap(pass_tao_f(Fa), pass_tao_f(Fb))) + (tao - tao));
+        // 注意: 簡化模型，假設 swap 後不額外等待（pass_time - tao = 0）
     };
 
     const double margin_ratio = 1.05;  // fidelity 超過 threshold 但不超過 5% 算「邊緣」
@@ -210,19 +234,21 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
             int h = (int)path.size() - 1;
             if (h < min_hop) continue;
 
-            Shape_vector sv = build_balanced_shape(path);
+            // 收集每條 edge 的 F_init
+            vector<double> edge_fids(h);
+            for (int k = 0; k < h; k++)
+                edge_fids[k] = graph.get_F_init(path[k], path[k+1]);
 
-            // 不做 purify 的真實 fidelity
-            Shape shape_no(sv);
-            double fid_no = shape_no.get_fidelity(A, B, n_param, T, tao, F_init, false);
+            // 不做 purify 的真實 fidelity（用和 Shape::get_fidelity 相同的公式）
+            vector<int> no_pur(h, 0);
+            double fid_no = calc_fidelity(0, h, edge_fids, no_pur);
 
             // 嘗試 1~3 rounds purification
             int best_rounds = -1;
             double fid_pur = 0;
             for (int rr = 1; rr <= max_purify_rounds; rr++) {
-                vector<int> purify_rounds(h, rr);  // 每條 edge 都做 rr 輪
-                Shape shape_pur(sv, purify_rounds);
-                double f = shape_pur.get_fidelity(A, B, n_param, T, tao, F_init, true);
+                vector<int> pur(h, rr);
+                double f = calc_fidelity(0, h, edge_fids, pur);
                 if (f >= fid_th) {
                     best_rounds = rr;
                     fid_pur = f;
