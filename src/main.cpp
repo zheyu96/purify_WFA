@@ -358,6 +358,12 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
 int main(){
     string file_path = "../data/";
 
+    // 每次執行時清空 ZFA2_Purification_Stats.txt
+    {
+        ofstream clear_file(file_path + "log/ZFA2_Purification_Stats.txt", ios::trunc);
+        clear_file.close();
+    }
+
     map<string, double> default_setting;
     default_setting["num_nodes"] = 30;
     default_setting["request_cnt"] = 50;
@@ -690,7 +696,12 @@ int main(){
                     vector<AlgorithmBase*> algorithms;
                     //algorithms.emplace_back(new WernerAlgo_UB(graph,requests,paths));
                     algorithms.emplace_back(new WernerAlgo3(graph,requests,paths));  // ZFA_UB (LP upper bound with purify)
-                    algorithms.emplace_back(new WernerAlgo2(graph,requests,paths));
+                    {
+                        auto* zfa2 = new WernerAlgo2(graph,requests,paths);
+                        string exp_label = X_name + "=" + to_string(change_value) + " Round=" + to_string(r);
+                        zfa2->set_experiment_label(exp_label);
+                        algorithms.emplace_back(zfa2);
+                    }
                     algorithms.emplace_back(new WernerAlgo(graph,requests,paths));
                     if(X_name!="Zmin"&&X_name!="bucket_eps"&&X_name!="time_eta"){
                         algorithms.emplace_back(new MyAlgo1(graph, requests, paths));

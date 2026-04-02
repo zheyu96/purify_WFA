@@ -417,7 +417,14 @@ void WernerAlgo2::run() {
         // [診斷] 統計 rounding 結果
         int round_total = 0, round_purified = 0, round_nopurify = 0;
         int round_fail_fid = 0, round_fail_mem = 0, round_fail_purify_mem = 0;
-        map<int, vector<pair<double, double>>> purification_stats;
+        // purification 前後 fidelity/prob 記錄
+        struct PurifyLogEntry {
+            int src, dst, hop;
+            bool has_purify;
+            double fid_before, werner_before, prob_before, fidprob_before;
+            double fid_after, werner_after, prob_after, fidprob_after;
+        };
+        vector<PurifyLogEntry> purify_log_entries;
 
         for(pair<double, Shape_vector> P : shapes) {
             // 用 purify_rounds 構造 Shape（若有的話）
@@ -518,24 +525,30 @@ void WernerAlgo2::run() {
                 }
                 finished.push_back(request_index);
 
-                // [新增] 收集純化資訊
-                Shape_vector sv = shape.get_node_mem_range();
-                vector<int> pur_rounds = shape.get_link_purify_rounds();
-                // 遍歷每一段 Link
-                for(size_t i = 0; i < sv.size() - 1; ++i) {
-                    int rounds = (i < pur_rounds.size()) ? pur_rounds[i] : 0;
-                    if (rounds > 0) {
-                        int u = sv[i].first;
-                        int v = sv[i+1].first;
-                        double w_e = graph.get_link_werner(u, v);
-                        double w_cur = w_e;
-                        for (int r = 0; r < rounds; r++) {
-                            double num = 3.0L * w_cur * w_e + 3.0L * w_cur + 3.0L * w_e - 1.0L;
-                            double den = 9.0L * w_cur * w_e - 3.0L * w_cur - 3.0L * w_e + 5.0L;
-                            w_cur = num / den;
-                        }
-                        purification_stats[rounds].push_back({w_e, w_cur});
-                    }
+                // [新增] 收集 purification 前後的 fidelity 與 prob 統計
+                {
+                    // 計算不開放 purify 的 fidelity 和 prob
+                    Shape shape_no_pur(P.second);  // 不帶 purify rounds 的 shape
+                    double fid_no_pur = shape_no_pur.get_fidelity(A, B, n, T, tao, graph.get_F_init(), false);
+                    double prob_no_pur = graph.path_Pr(shape_no_pur);
+
+                    // 計算開放 purify 後的 fidelity 和 prob
+                    double fid_with_pur = shape.get_fidelity(A, B, n, T, tao, graph.get_F_init(), true);
+                    double prob_with_pur = has_purify ? graph.path_Pr_purify(shape) : graph.path_Pr(shape);
+
+                    Shape_vector sv = shape.get_node_mem_range();
+                    int src = sv.front().first, dst = sv.back().first;
+                    int hop = (int)sv.size() - 1;
+
+                    // W = (4F - 1) / 3
+                    double werner_no_pur = (4.0 * fid_no_pur - 1.0) / 3.0;
+                    double werner_with_pur = (4.0 * fid_with_pur - 1.0) / 3.0;
+
+                    purify_log_entries.push_back({
+                        src, dst, hop, has_purify,
+                        fid_no_pur, werner_no_pur, prob_no_pur, fid_no_pur * prob_no_pur,
+                        fid_with_pur, werner_with_pur, prob_with_pur, fid_with_pur * prob_with_pur
+                    });
                 }
             }
         }
@@ -556,46 +569,32 @@ void WernerAlgo2::run() {
             requests.erase(requests.begin() + fin);
         }
 
-        // [新增] 將統計結果寫入檔案
-        // 檔案路徑與 main.cpp 中的 log 路徑一致 (假設在 ../data/log/)
-        // 使用 append 模式，避免覆蓋之前的回合記錄
+        // [新增] 將 purification 前後比較統計寫入檔案 (append 模式)
         string log_file_path = "../data/log/ZFA2_Purification_Stats.txt";
         ofstream log_file(log_file_path, ios::app);
-        
+
         if (log_file.is_open()) {
-            if (!purification_stats.empty()) {
-                log_file << "--- Round Log ---" << endl;
-                for(auto const& [len, vec] : purification_stats) {
-                    log_file << "Rounds " << len << " (Count: " << vec.size() << "):" << endl;
-                    for(auto const& pair : vec) {
-                        double w_raw = pair.first;
-                        double w_new = pair.second;
-                        // 轉換為 Fidelity 方便閱讀: F = (3W+1)/4
-                        double f_raw = (3.0 * w_raw + 1.0) / 4.0;
-                        double f_new = (3.0 * w_new + 1.0) / 4.0;
-                        
-                        log_file << "  W: " << w_raw << " -> " << w_new 
-                                 << " | F: " << f_raw << " -> " << f_new << endl;
-                    }
-                }
-                log_file << "-----------------" << endl;
+            if (!experiment_label.empty()) {
+                log_file << "=== Experiment: " << experiment_label << " ===" << endl;
             }
+            log_file << "--- Accepted Requests (total: " << purify_log_entries.size() << ") ---" << endl;
+            for (auto& e : purify_log_entries) {
+                log_file << "  SD=(" << e.src << "," << e.dst << ") hop=" << e.hop
+                         << " purified=" << (e.has_purify ? "YES" : "NO") << endl;
+                log_file << "    [Before Purify] fidelity=" << e.fid_before
+                         << "  werner=" << e.werner_before
+                         << "  prob=" << e.prob_before
+                         << "  fid*prob=" << e.fidprob_before << endl;
+                log_file << "    [After  Purify] fidelity=" << e.fid_after
+                         << "  werner=" << e.werner_after
+                         << "  prob=" << e.prob_after
+                         << "  fid*prob=" << e.fidprob_after << endl;
+            }
+            log_file << "-----------------" << endl;
             log_file.close();
         } else {
             cerr << "[Warning] Unable to open log file: " << log_file_path << endl;
         }
-
-        // 同時印到 cerr 方便即時觀察
-        cerr << "\n=== [WernerAlgo2 Purification Stats] ===" << endl;
-        if (purification_stats.empty()) {
-            cerr << "No links were purified (all rounds = 0)." << endl;
-        } else {
-            for(auto const& [len, vec] : purification_stats) {
-                cerr << "Rounds " << len << " (Count: " << vec.size() << "):" << endl;
-                // 為了避免洗版，終端機只印數量，詳細內容看檔案
-            }
-        }
-        cerr << "========================================\n" << endl;
     }
     update_res();
     cerr << "[" << algorithm_name << "] end" << endl;
