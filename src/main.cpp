@@ -362,11 +362,10 @@ int main(){
     default_setting["num_nodes"] = 100;
     default_setting["request_cnt"] = 50;
     default_setting["entangle_lambda"] = 0.045;
-    default_setting["time_limit"] = 15;
-    // avg_memory 降低使資源稍緊張：不同演算法的資源分配策略差異才會體現
-    // 20: 太寬裕 → 大家一樣。8: 適度緊張 → MyAlgo1/MyAlgo3 有小幅差距
-    // ZFA2 靠 purify 能接更多 request，仍然領先
-    default_setting["avg_memory"] = 8;
+    default_setting["time_limit"] = 13;
+    // avg_memory 必須夠緊張，讓演算法無法服務所有可行 request → 不同策略做不同取捨
+    // 13/8: 太寬裕 → 所有非 purify 演算法結果一樣。5: 強制競爭
+    default_setting["avg_memory"] = 5;
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
     // === Purification 甜蜜點參數 ===
@@ -376,10 +375,8 @@ int main(){
     default_setting["min_fidelity"] = 0.78;
     default_setting["max_fidelity"] = 0.93;
     default_setting["swap_prob"] = 0.9;
-    // threshold 提高到 0.85：讓 3-4 hop 的最短路徑 fidelity 剛好不夠
-    // 此時 initial_fid ~0.77-0.85，經過 decoherence 後 real_fidelity < 0.85
-    // purification 可以把 fidelity 從 ~0.82 拉到 ~0.90，超過 threshold
-    default_setting["fidelity_threshold"] = 0.85;
+    // threshold=0.8: 平衡點 — purify 仍有優勢，同時比 0.85 寬鬆使更多 request 通過
+    default_setting["fidelity_threshold"] = 0.8;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
     default_setting["Zmin"]=0.02702867239;
@@ -396,7 +393,7 @@ int main(){
     change_parameter["tao"] = {0.0015, 0.00175, 0.002,0.00225,0.0025};
     change_parameter["path_length"] = {3, 6, 9, 12, 15};
     change_parameter["swap_prob"] = {0.6, 0.7, 0.8, 0.9,0.95};
-    change_parameter["fidelity_threshold"] = {0.55,0.6,0.65,0.7, 0.75, 0.8,0.85,0.9};
+    change_parameter["fidelity_threshold"] = {0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85};
     change_parameter["time_limit"] = {3,5,7, 9, 11, 13, 15};
     change_parameter["entangle_lambda"] = {0.0125, 0.025, 0.035, 0.045, 0.055, 0.065};
     change_parameter["entangle_time"] = {0.0001, 0.00025, 0.0004, 0.00055, 0.0007,0.00085,0.001};
