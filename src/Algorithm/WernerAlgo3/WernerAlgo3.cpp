@@ -305,16 +305,16 @@ void WernerAlgo3::run() {
         variable_initialize();
         int it=0;
         double eps=1e-4;
+        const int REUSE = 5;
         cerr << "[" << algorithm_name << "] LP phase start, requests=" << requests.size() << endl;
         while (obj+eps < 1.0) {
             it++;
             Shape_vector shape=separation_oracle();
-            if (shape.empty()) { cerr << "[" << algorithm_name << "] iter " << it << ": oracle returned empty, stop" << endl; break; }
+            if (shape.empty()) { cerr << "[" << algorithm_name << "] iter " << it << ": oracle empty, stop" << endl; break; }
             vector<int> cur_purify_rounds;
             if(shape_purify_map.count(shape))
                 cur_purify_rounds = shape_purify_map[shape];
 
-            double q = 1.0;
             map<pair<int,int>, int> total_need_q;
             for(int i=0;i<(int)shape.size();i++){
                 for(pair<int,int> usedtime:shape[i].second){
@@ -337,49 +337,51 @@ void WernerAlgo3::run() {
                     total_need_q[{v, t}] += extra;
                 }
             }
-            for(auto& P : total_need_q){
-                int node_id = P.first.first, t = P.first.second;
-                double theta = P.second;
-                double cap = graph.get_node_memory_at(node_id, t);
-                if(cap > 0) q = min(q, cap / theta);
-                else q = 0;
-            }
-            if(q<=1e-10) break;
-            int req_idx=-1;
-            for(int i=0;i<requests.size();i++){
-                int ln=shape.front().first,rn=shape.back().first;
-                if(requests[i]==make_pair(ln,rn)){
-                    if(req_idx==-1||alpha[req_idx]>alpha[i]){
-                        req_idx=i;
+
+            for(int reuse = 0; reuse < REUSE && obj+eps < 1.0; reuse++) {
+                double q = 1.0;
+                for(auto& P : total_need_q){
+                    int node_id = P.first.first, t = P.first.second;
+                    double theta = P.second;
+                    double cap = graph.get_node_memory_at(node_id, t);
+                    if(cap > 0) q = min(q, cap / theta);
+                    else q = 0;
+                }
+                if(q<=1e-10) break;
+                int req_idx=-1;
+                for(int i=0;i<requests.size();i++){
+                    int ln=shape.front().first,rn=shape.back().first;
+                    if(requests[i]==make_pair(ln,rn)){
+                        if(req_idx==-1||alpha[req_idx]>alpha[i]){
+                            req_idx=i;
+                        }
                     }
                 }
-            }
-            if(req_idx==-1) break;
-            x[req_idx][shape]+=q;
-            // 每 10 輪印一次進度
-            if (it % 10 == 1) {
-                int src=shape.front().first, dst=shape.back().first;
-                cerr << "[" << algorithm_name << "] iter " << it
-                     << " | obj=" << (double)obj
-                     << " | q=" << (double)q
-                     << " | req=(" << src << "," << dst << ")"
-                     << " | hops=" << (shape.size()-1)
-                     << " | x_shapes=" << x[req_idx].size()
-                     << endl;
-            }
-            double ori=alpha[req_idx];
-            alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
-            obj+=(alpha[req_idx]-ori);
-            for(auto& P : total_need_q){
-                int node_id = P.first.first, t = P.first.second;
-                double theta = P.second;
-                double original = beta[node_id][t];
-                if(graph.get_node_memory_at(node_id, t) == 0) {
-                    beta[node_id][t] = INF;
-                } else {
-                    beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
+                if(req_idx==-1) break;
+                x[req_idx][shape]+=q;
+                if (it % 10 == 1 && reuse == 0) {
+                    int src=shape.front().first, dst=shape.back().first;
+                    cerr << "[" << algorithm_name << "] oracle#" << it
+                         << " | obj=" << (double)obj
+                         << " | q=" << (double)q
+                         << " | req=(" << src << "," << dst << ")"
+                         << " | hops=" << (shape.size()-1)
+                         << endl;
                 }
-                obj += (beta[node_id][t] - original) * graph.get_node_memory_at(node_id, t);
+                double ori=alpha[req_idx];
+                alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
+                obj+=(alpha[req_idx]-ori);
+                for(auto& P : total_need_q){
+                    int node_id = P.first.first, t = P.first.second;
+                    double theta = P.second;
+                    double original = beta[node_id][t];
+                    if(graph.get_node_memory_at(node_id, t) == 0) {
+                        beta[node_id][t] = INF;
+                    } else {
+                        beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
+                    }
+                    obj += (beta[node_id][t] - original) * graph.get_node_memory_at(node_id, t);
+                }
             }
         }
 

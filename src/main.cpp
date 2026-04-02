@@ -363,7 +363,10 @@ int main(){
     default_setting["request_cnt"] = 50;
     default_setting["entangle_lambda"] = 0.045;
     default_setting["time_limit"] = 20;
-    default_setting["avg_memory"] = 20; // 16
+    // avg_memory 降低使資源稍緊張：不同演算法的資源分配策略差異才會體現
+    // 20: 太寬裕 → 大家一樣。8: 適度緊張 → MyAlgo1/MyAlgo3 有小幅差距
+    // ZFA2 靠 purify 能接更多 request，仍然領先
+    default_setting["avg_memory"] = 8;
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
     // === Purification 甜蜜點參數 ===
@@ -388,7 +391,7 @@ int main(){
     change_parameter["request_cnt"] = {10,20,30,40,50,60,70,80};
     change_parameter["num_nodes"] = {40, 70, 100, 130, 160};
     change_parameter["min_fidelity"] = {0.6, 0.7, 0.8, 0.9, 0.95};
-    change_parameter["avg_memory"] = {2,4,6, 8, 10,12,14};
+    change_parameter["avg_memory"] = {4, 6, 8, 10, 12, 16, 20};
     // change_parameter["tao"] = {0.3, 0.4, 0.5, 0.6, 0.7};
     change_parameter["tao"] = {0.0015, 0.00175, 0.002,0.00225,0.0025};
     change_parameter["path_length"] = {3, 6, 9, 12, 15};
@@ -439,9 +442,9 @@ int main(){
         // 目標：purify 演算法明顯優於 non-purify，但 non-purify 也能接一些（答案不為 0）
         // 比例：~60% purify 甜蜜點（只有 purify 能接）+ ~40% baseline（所有人都能接）
         //
-        // 容量估算：100 nodes × avg_mem=20 × time_limit=20 = 40k memory-timeslots
-        // 每個 purify shape ~30-45 mem-slots，baseline ~16-25 → 實際可服務 ~30-60 個
-        // 生成量要大於可服務量（讓演算法有選擇空間），但不要太多（浪費 LP 時間）
+        // 容量估算：100 nodes × avg_mem=8 × time_limit=20 = 16k memory-timeslots
+        // memory 稍緊張 → 不同演算法的分配策略差異體現
+        // 生成量 > 可服務量 → 讓演算法需要做選擇（競爭）
         int total_cnt = 80;  // 略高於可服務量，讓 LP 有選擇空間
         double purify_ratio = 0.6;
         int purify_cnt = (int)(total_cnt * purify_ratio);    // ~48 purify

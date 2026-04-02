@@ -325,19 +325,19 @@ void WernerAlgo2::run() {
         //cerr << "\033[1;31m"<< "[WernerAlgo's parameter] : "<< dpp.Zmin<<" "<<dpp.eps_bucket<<" "<<dpp.eta<< "\033[0m"<< endl;
         int it=0;
         double eps=1e-4;
+        const int REUSE = 5;  // 每次 oracle 找到 shape 後重複灌 REUSE 次流量
         while (obj+eps < 1.0) {
-            //if(++it>200) break;
+            it++;
             Shape_vector shape=separation_oracle();
             if (shape.empty()) break;
-            // 先用MyAlgo1的框架刻出來
+
             // 取得此 shape 對應的 purify rounds
             vector<int> cur_purify_rounds;
             if(shape_purify_map.count(shape))
                 cur_purify_rounds = shape_purify_map[shape];
 
-            double q = 1.0;
-            // 先算基本 memory 需求
-            map<pair<int,int>, int> total_need_q; // (node, t) -> total amount
+            // 計算 total_need_q（只算一次，REUSE 次共用）
+            map<pair<int,int>, int> total_need_q;
             for(int i=0;i<(int)shape.size();i++){
                 for(pair<int,int> usedtime:shape[i].second){
                     int start=usedtime.first,end=usedtime.second;
@@ -345,8 +345,6 @@ void WernerAlgo2::run() {
                         total_need_q[{shape[i].first, t}]++;
                 }
             }
-            // 加入 purification 額外 memory 需求
-            // 注意：Purify_in_vt 的 index 0 對應最新時間 (link_end)，需反向對應
             for(int li=0; li<(int)shape.size()-1; li++){
                 int rounds = (li < (int)cur_purify_rounds.size()) ? cur_purify_rounds[li] : 0;
                 if(rounds <= 0) continue;
@@ -361,41 +359,46 @@ void WernerAlgo2::run() {
                     total_need_q[{v, t}] += extra;
                 }
             }
-            for(auto& P : total_need_q){
-                int node_id = P.first.first, t = P.first.second;
-                double theta = P.second;
-                double cap = graph.get_node_memory_at(node_id, t);
-                if(cap > 0) q = min(q, cap / theta);
-                else q = 0;
-            }
-            if(q<=1e-10) break;
-            int req_idx=-1;
-            for(int i=0;i<requests.size();i++){
-                int ln=shape.front().first,rn=shape.back().first;
-                if(requests[i]==make_pair(ln,rn)){
-                    if(req_idx==-1||alpha[req_idx]>alpha[i]){
-                        req_idx=i;
+
+            // 同一個 shape 灌 REUSE 次流量
+            for(int reuse = 0; reuse < REUSE && obj+eps < 1.0; reuse++) {
+                double q = 1.0;
+                for(auto& P : total_need_q){
+                    int node_id = P.first.first, t = P.first.second;
+                    double theta = P.second;
+                    double cap = graph.get_node_memory_at(node_id, t);
+                    if(cap > 0) q = min(q, cap / theta);
+                    else q = 0;
+                }
+                if(q<=1e-10) break;
+                int req_idx=-1;
+                for(int i=0;i<requests.size();i++){
+                    int ln=shape.front().first,rn=shape.back().first;
+                    if(requests[i]==make_pair(ln,rn)){
+                        if(req_idx==-1||alpha[req_idx]>alpha[i]){
+                            req_idx=i;
+                        }
                     }
                 }
-            }
-            if(req_idx==-1) break;
-            x[req_idx][shape]+=q;
-            double ori=alpha[req_idx];
-            alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
-            obj+=(alpha[req_idx]-ori);
-            // 用 total_need_q（含 purification 額外 memory）來更新 beta
-            for(auto& P : total_need_q){
-                int node_id = P.first.first, t = P.first.second;
-                double theta = P.second;
-                double original = beta[node_id][t];
-                if(graph.get_node_memory_at(node_id, t) == 0) {
-                    beta[node_id][t] = INF;
-                } else {
-                    beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
+                if(req_idx==-1) break;
+                x[req_idx][shape]+=q;
+                double ori=alpha[req_idx];
+                alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
+                obj+=(alpha[req_idx]-ori);
+                for(auto& P : total_need_q){
+                    int node_id = P.first.first, t = P.first.second;
+                    double theta = P.second;
+                    double original = beta[node_id][t];
+                    if(graph.get_node_memory_at(node_id, t) == 0) {
+                        beta[node_id][t] = INF;
+                    } else {
+                        beta[node_id][t] = beta[node_id][t] * (1 + epsilon * (q / (graph.get_node_memory_at(node_id, t) / theta)));
+                    }
+                    obj += (beta[node_id][t] - original) * graph.get_node_memory_at(node_id, t);
                 }
-                obj += (beta[node_id][t] - original) * graph.get_node_memory_at(node_id, t);
             }
         }
+        cerr << "[" << algorithm_name << "] LP done, " << it << " oracle calls" << endl;
         vector<pair<double, Shape_vector>> shapes;
 
         for(int i = 0; i < (int)requests.size(); i++) {
