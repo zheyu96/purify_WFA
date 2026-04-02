@@ -362,12 +362,12 @@ int main(){
     default_setting["num_nodes"] = 30;
     default_setting["request_cnt"] = 50;
     default_setting["entangle_lambda"] = 0.045;
-    default_setting["time_limit"] = 7;
+    default_setting["time_limit"] = 13;
     // avg_memory 必須夠緊張，讓演算法無法服務所有可行 request → 不同策略做不同取捨
     // 13/8: 太寬裕 → 所有非 purify 演算法結果一樣。5: 強制競爭
     default_setting["avg_memory"] = 5;
     default_setting["tao"] = 0.002;
-    default_setting["path_length"] = 4;
+    default_setting["path_length"] = 6;
     // === Purification 甜蜜點參數 ===
     // min_fidelity 降低使 w_e 落在 ~0.73-0.87，讓 3-4 hop 就需要 purify
     // fidelity_threshold 提高使 w_th 更嚴格，擴大甜蜜點範圍
@@ -448,44 +448,44 @@ int main(){
         //     每條吃很多 memory → 不做 purify 的 MyAlgo1 省 memory，塞更多
         int total_cnt = 200;  // pool 要 >= max(request_cnt)=160
 
-        int cnt_A = (int)(total_cnt * 0.35);  // purify-needed → ZFA2
+        int cnt_A = (int)(total_cnt * 0.45);  // purify-needed → ZFA2 (增加比例，強化 purify 優勢)
         int cnt_B = (int)(total_cnt * 0.25);  // high-fid short → MyAlgo1/ZFA
         int cnt_C = (int)(total_cnt * 0.25);  // high-fid diverse → MyAlgo3
-        int cnt_D = total_cnt - cnt_A - cnt_B - cnt_C;  // long-path → MyAlgo1
+        int cnt_D = total_cnt - cnt_A - cnt_B - cnt_C;  // long-path → MyAlgo1 (降低比例)
 
         // (A) purify sweet spot: 只有 ZFA2 做 purify 能過 threshold
-        auto reqs_A = generate_requests_purify_needed(graph, cnt_A, 2);
+        auto reqs_A = generate_requests_purify_needed(graph, cnt_A, 3);  // min_hop 2→3，增加 hop
 
         // (B) high-fid short-path (hop 2~3, fidelity > threshold+0.05)
         //     所有演算法都能接 → 比的是全局資源分配效率
-        auto reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.05, 2, 1.0);
+        auto reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.05, 3, 1.0);  // hop_th 2→3
         if ((int)reqs_B.size() < cnt_B) {
-            reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.01, 2);
+            reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.01, 3);
         }
 
         // (C) high-fid diverse-path: fidelity > threshold 但 hop 從 2~5 都有
         //     關鍵：都過 threshold 所以大家都能接，但 path 長度/fidelity 差異大
         //     MyAlgo3 的 fid^10 * Pr / mem^0.33 scoring 在這種多樣化場景下
         //     能比固定 LP 策略更好地挑選 cost-effective 組合
-        auto reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold, 2, 1.0);
+        auto reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold, 3, 1.0);  // hop_th 2→3
         if ((int)reqs_C.size() < cnt_C) {
-            reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold - 0.02, 2);
+            reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold - 0.02, 3);
         }
 
         // (D) long-path memory-hungry (hop >= 4, fidelity > threshold)
         //     path 長 → 每條吃大量 memory → ZFA2 額外 purify 開銷雪上加霜
         //     MyAlgo1 (LP + 零 purify 開銷) 能在相同 memory 下塞更多
-        auto reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold, 4, 1.0);
+        auto reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold, 5, 1.0);  // hop_th 4→5
         if ((int)reqs_D.size() < cnt_D) {
-            reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold - 0.03, 3);
+            reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold - 0.03, 4);
         }
 
         // 合併：交錯排列 A-B-C-D 確保各類均勻分佈
         default_requests[r].clear();
         int pi_A = 0, pi_B = 0, pi_C = 0, pi_D = 0;
         while ((int)default_requests[r].size() < total_cnt) {
-            // 每輪: 3A + 2B + 2C + 1D ≈ 比例 35:25:25:15
-            for (int k = 0; k < 3 && (int)default_requests[r].size() < total_cnt; k++) {
+            // 每輪: 5A + 2B + 2C + 1D ≈ 比例 45:25:25:5 (偏重 purify，hop 數更多)
+            for (int k = 0; k < 5 && (int)default_requests[r].size() < total_cnt; k++) {
                 if (pi_A < (int)reqs_A.size()) default_requests[r].push_back(reqs_A[pi_A++]);
             }
             for (int k = 0; k < 2 && (int)default_requests[r].size() < total_cnt; k++) {
@@ -530,10 +530,10 @@ int main(){
             for (auto &[h, cnt] : hop_dist)
                 cerr << h << "hop=" << cnt << " ";
             cerr << endl
-                 << "  A(35%): purify-needed → ZFA2 leads overall" << endl
-                 << "  B(25%): hi-fid short → LP global opt (MyAlgo1/ZFA competitive)" << endl
-                 << "  C(25%): hi-fid diverse → adaptive scoring (MyAlgo3 competitive)" << endl
-                 << "  D(15%): long-path → memory efficiency (MyAlgo1 no purify overhead)" << endl
+                 << "  A(45%): purify-needed (hop>=3) → ZFA2 leads overall" << endl
+                 << "  B(25%): hi-fid (hop>=3) → LP global opt (MyAlgo1/ZFA competitive)" << endl
+                 << "  C(25%): hi-fid diverse (hop>=3) → adaptive scoring (MyAlgo3 competitive)" << endl
+                 << "  D(5%): long-path (hop>=5) → memory efficiency (MyAlgo1 no purify overhead)" << endl
                  << "================================================"
                  << "\033[0m" << endl;
         }
