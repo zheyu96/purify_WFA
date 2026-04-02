@@ -383,7 +383,7 @@ int main(){
     default_setting["bucket_eps"]=0.01;
     default_setting["time_eta"]=0.001;
     default_setting["hop_count"]=3;
-    default_setting["delta_P"]=0.0001;
+    default_setting["delta_P"]=0.001;
     map<string, vector<double>> change_parameter;
     change_parameter["request_cnt"] = {10,20,30,40,50,60,70,80,90,100};
     change_parameter["num_nodes"] = {30, 40, 50, 60, 70};
