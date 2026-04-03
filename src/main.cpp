@@ -366,7 +366,7 @@ int main(){
 
     map<string, double> default_setting;
     default_setting["num_nodes"] = 30;
-    default_setting["request_cnt"] = 50;
+    default_setting["request_cnt"] = 30;
     default_setting["entangle_lambda"] = 0.045;
     default_setting["time_limit"] = 13;
     // avg_memory 必須夠緊張，讓演算法無法服務所有可行 request → 不同策略做不同取捨
@@ -389,9 +389,9 @@ int main(){
     default_setting["bucket_eps"]=0.01;
     default_setting["time_eta"]=0.001;
     default_setting["hop_count"]=3;
-    default_setting["delta_P"]=0.001;
+    default_setting["delta_P"]=0.01;
     map<string, vector<double>> change_parameter;
-    change_parameter["request_cnt"] = {40,60,80,100,120,140,160};
+    change_parameter["request_cnt"] = {10,20,30,40,50,60};
     change_parameter["num_nodes"] = {30, 40, 50, 60, 70};
     change_parameter["min_fidelity"] = {0.6, 0.7, 0.8, 0.9, 0.95};
     change_parameter["avg_memory"] = {4, 6, 8, 10, 12, 16, 20};
