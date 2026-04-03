@@ -39,12 +39,11 @@ Graph::Graph(string filename, int _time_limit, double _swap_prob, int avg_memory
     avg_entangle_prob = 0;
     for(int i = 0; i < num_edges; i++) {
         int v, u;
-        double f_init, entangle_prob, fid_ratio;
-        // Paper Eq.13 的 Pr 和 Eq.2 的 exp(-γl) 分別讀取
-        graph_file >> v >> u >> entangle_prob >> fid_ratio;
+        double f_init,entangle_prob;
+        graph_file >> v >> u >> entangle_prob;
+        f_init=entangle_prob;
         assert(v != u);
-        // fid_ratio = exp(-γ*l) ∈ (0,1]，縮放到 [min_fidelity, max_fidelity]
-        f_init = fid_ratio * (max_fidelity - min_fidelity) + min_fidelity;
+        f_init = (f_init) * (max_fidelity - min_fidelity) + min_fidelity;
         adj_list[v].push_back(u);
         adj_list[u].push_back(v);
         F_init[{v, u}] = f_init;
