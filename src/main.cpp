@@ -378,10 +378,12 @@ int main(){
     // min_fidelity 降低使 w_e 落在 ~0.73-0.87，讓 3-4 hop 就需要 purify
     // fidelity_threshold 提高使 w_th 更嚴格，擴大甜蜜點範圍
     // 原始值: min_fidelity=0.89, fidelity_threshold=0.7
-    default_setting["min_fidelity"] = 0.80;
-    default_setting["max_fidelity"] = 0.98;
+    // F_init = fid_ratio * (max - min) + min，fid_ratio 由距離決定 (Paper Eq.2)
+    // 範圍要夠寬：短 edge F~0.97 (容易過)，長 edge F~0.75 (需 purify 或選路)
+    default_setting["min_fidelity"] = 0.75;
+    default_setting["max_fidelity"] = 0.97;
     default_setting["swap_prob"] = 0.9;
-    default_setting["fidelity_threshold"] = 0.8;
+    default_setting["fidelity_threshold"] = 0.75;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
     // Paper Eq.2: Fe = 1/4 + 3/4 * exp(-gamma * l)
@@ -448,57 +450,56 @@ int main(){
             exit(1);
         }
         Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
-        // === 混合生成 4 類 request，讓每個演算法都有擅長的場景 ===
-        // 設計原則：ZFA2 靠 purification 整體領先，但其他演算法在各自擅長場景有競爭力
+        // === 混合生成 5 類 request，讓每個演算法都有擅長的場景 ===
+        // 設計原則：每類 request 讓不同演算法有不同的表現
         //
-        // (A) ~35% purify-needed: 不做 purify 過不了 threshold → ZFA2 獨佔優勢
-        //     這是 ZFA2 領先的主要來源
-        // (B) ~25% high-fid short-path: fidelity 很高 (>threshold)、hop 2~3
+        // (A) ~25% purify-needed: 不做 purify 過不了 threshold → ZFA2 獨佔優勢
+        // (B) ~20% high-fid short-path: fidelity 遠高於 threshold、hop 2~3
         //     大家都能接 → LP 全局最優的 MyAlgo1/ZFA 分配更好
-        // (C) ~25% high-fid diverse-path: fidelity > threshold，但 hop 長度多樣 (2~5)
-        //     都能接但 cost 差異大 → MyAlgo3 adaptive scoring 選最划算組合
-        // (D) ~15% long-path memory-hungry: hop >= 4，fidelity > threshold
-        //     每條吃很多 memory → 不做 purify 的 MyAlgo1 省 memory，塞更多
-        int total_cnt = 200;  // pool 要 >= max(request_cnt)=160
+        // (C) ~20% marginal-fid: fidelity 剛好在 threshold 附近 (±0.03)
+        //     選路策略差異最大 → prob-aware (ZFA) vs cost-aware (MyAlgo1) 區隔
+        // (D) ~20% diverse-path: fidelity > threshold，hop 多樣 (2~5)
+        //     都能接但 cost 差異大 → MyAlgo3 adaptive scoring 更好
+        // (E) ~15% long-path: hop >= 4，fidelity > threshold
+        //     memory 吃重 → 不做 purify 的 MyAlgo1 省 memory 能塞更多
+        int total_cnt = 200;
 
-        int cnt_A = (int)(total_cnt * 0.35);  // purify-needed → ZFA2
-        int cnt_B = (int)(total_cnt * 0.25);  // high-fid short → MyAlgo1/ZFA
-        int cnt_C = (int)(total_cnt * 0.25);  // high-fid diverse → MyAlgo3
-        int cnt_D = total_cnt - cnt_A - cnt_B - cnt_C;  // long-path → MyAlgo1
+        int cnt_A = (int)(total_cnt * 0.25);  // purify-needed → ZFA2
+        int cnt_B = (int)(total_cnt * 0.20);  // high-fid short → MyAlgo1/ZFA
+        int cnt_C = (int)(total_cnt * 0.20);  // marginal-fid → 選路區隔
+        int cnt_D = (int)(total_cnt * 0.20);  // diverse-path → MyAlgo3
+        int cnt_E = total_cnt - cnt_A - cnt_B - cnt_C - cnt_D;  // long-path → MyAlgo1
 
         // (A) purify sweet spot: 只有 ZFA2 做 purify 能過 threshold
         auto reqs_A = generate_requests_purify_needed(graph, cnt_A, 2);
 
-        // (B) high-fid short-path (hop 2~3, fidelity > threshold+0.05)
-        //     所有演算法都能接 → 比的是全局資源分配效率
-        auto reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.05, 2, 1.0);
-        if ((int)reqs_B.size() < cnt_B) {
-            reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.01, 2);
-        }
+        // (B) high-fid short-path: fidelity 遠高於 threshold
+        auto reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.08, 2, 1.0);
+        if ((int)reqs_B.size() < cnt_B)
+            reqs_B = generate_requests_fid(graph, cnt_B, fidelity_threshold + 0.03, 2);
 
-        // (C) high-fid diverse-path: fidelity > threshold 但 hop 從 2~5 都有
-        //     關鍵：都過 threshold 所以大家都能接，但 path 長度/fidelity 差異大
-        //     MyAlgo3 的 fid^10 * Pr / mem^0.33 scoring 在這種多樣化場景下
-        //     能比固定 LP 策略更好地挑選 cost-effective 組合
-        auto reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold, 2, 1.0);
-        if ((int)reqs_C.size() < cnt_C) {
-            reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold - 0.02, 2);
-        }
+        // (C) marginal-fid: fidelity 剛好在 threshold 附近，選路影響很大
+        //     fid ∈ [threshold, threshold+0.03]
+        auto reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold, 2, fidelity_threshold + 0.03);
+        if ((int)reqs_C.size() < cnt_C)
+            reqs_C = generate_requests_fid(graph, cnt_C, fidelity_threshold - 0.02, 2, fidelity_threshold + 0.05);
 
-        // (D) long-path memory-hungry (hop >= 4, fidelity > threshold)
-        //     path 長 → 每條吃大量 memory → ZFA2 額外 purify 開銷雪上加霜
-        //     MyAlgo1 (LP + 零 purify 開銷) 能在相同 memory 下塞更多
-        auto reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold, 4, 1.0);
-        if ((int)reqs_D.size() < cnt_D) {
-            reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold - 0.03, 3);
-        }
+        // (D) diverse-path: fidelity > threshold，hop 2~5 都有
+        auto reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold, 2, 1.0);
+        if ((int)reqs_D.size() < cnt_D)
+            reqs_D = generate_requests_fid(graph, cnt_D, fidelity_threshold - 0.02, 2);
 
-        // 合併：交錯排列 A-B-C-D 確保各類均勻分佈
+        // (E) long-path: hop >= 4，fidelity > threshold
+        auto reqs_E = generate_requests_fid(graph, cnt_E, fidelity_threshold, 4, 1.0);
+        if ((int)reqs_E.size() < cnt_E)
+            reqs_E = generate_requests_fid(graph, cnt_E, fidelity_threshold - 0.03, 3);
+
+        // 合併：交錯排列 A-B-C-D-E 確保各類均勻分佈
         default_requests[r].clear();
-        int pi_A = 0, pi_B = 0, pi_C = 0, pi_D = 0;
+        int pi_A = 0, pi_B = 0, pi_C = 0, pi_D = 0, pi_E = 0;
         while ((int)default_requests[r].size() < total_cnt) {
-            // 每輪: 3A + 2B + 2C + 1D ≈ 比例 35:25:25:15
-            for (int k = 0; k < 3 && (int)default_requests[r].size() < total_cnt; k++) {
+            // 每輪: 2A + 2B + 2C + 2D + 1E ≈ 比例 25:20:20:20:15
+            for (int k = 0; k < 2 && (int)default_requests[r].size() < total_cnt; k++) {
                 if (pi_A < (int)reqs_A.size()) default_requests[r].push_back(reqs_A[pi_A++]);
             }
             for (int k = 0; k < 2 && (int)default_requests[r].size() < total_cnt; k++) {
@@ -507,12 +508,16 @@ int main(){
             for (int k = 0; k < 2 && (int)default_requests[r].size() < total_cnt; k++) {
                 if (pi_C < (int)reqs_C.size()) default_requests[r].push_back(reqs_C[pi_C++]);
             }
-            for (int k = 0; k < 1 && (int)default_requests[r].size() < total_cnt; k++) {
+            for (int k = 0; k < 2 && (int)default_requests[r].size() < total_cnt; k++) {
                 if (pi_D < (int)reqs_D.size()) default_requests[r].push_back(reqs_D[pi_D++]);
+            }
+            for (int k = 0; k < 1 && (int)default_requests[r].size() < total_cnt; k++) {
+                if (pi_E < (int)reqs_E.size()) default_requests[r].push_back(reqs_E[pi_E++]);
             }
             // 若所有 pool 都用完但還不夠，循環重用
             if (pi_A >= (int)reqs_A.size() && pi_B >= (int)reqs_B.size() &&
-                pi_C >= (int)reqs_C.size() && pi_D >= (int)reqs_D.size()) {
+                pi_C >= (int)reqs_C.size() && pi_D >= (int)reqs_D.size() &&
+                pi_E >= (int)reqs_E.size()) {
                 if (!reqs_A.empty()) pi_A = 0;
                 else if (!reqs_B.empty()) pi_B = 0;
                 else break;
@@ -536,17 +541,19 @@ int main(){
                  << "========== Request Generation Done ==========" << endl
                  << "  total=" << default_requests[r].size()
                  << " | A(purify)=" << reqs_A.size()
-                 << " | B(hi-fid-short)=" << reqs_B.size()
-                 << " | C(hi-fid-diverse)=" << reqs_C.size()
-                 << " | D(long-path)=" << reqs_D.size() << endl
+                 << " | B(hi-fid)=" << reqs_B.size()
+                 << " | C(marginal)=" << reqs_C.size()
+                 << " | D(diverse)=" << reqs_D.size()
+                 << " | E(long)=" << reqs_E.size() << endl
                  << "  hop distribution: ";
             for (auto &[h, cnt] : hop_dist)
                 cerr << h << "hop=" << cnt << " ";
             cerr << endl
-                 << "  A(35%): purify-needed → ZFA2 leads overall" << endl
-                 << "  B(25%): hi-fid short → LP global opt (MyAlgo1/ZFA competitive)" << endl
-                 << "  C(25%): hi-fid diverse → adaptive scoring (MyAlgo3 competitive)" << endl
-                 << "  D(15%): long-path → memory efficiency (MyAlgo1 no purify overhead)" << endl
+                 << "  A(25%): purify-needed → ZFA2 leads" << endl
+                 << "  B(20%): hi-fid short → LP global opt (MyAlgo1/ZFA)" << endl
+                 << "  C(20%): marginal-fid → routing strategy differentiation" << endl
+                 << "  D(20%): diverse-path → adaptive scoring (MyAlgo3)" << endl
+                 << "  E(15%): long-path → memory efficiency (MyAlgo1)" << endl
                  << "================================================"
                  << "\033[0m" << endl;
         }
