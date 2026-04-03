@@ -417,12 +417,22 @@ void WernerAlgo2::run() {
         // [診斷] 統計 rounding 結果
         int round_total = 0, round_purified = 0, round_nopurify = 0;
         int round_fail_fid = 0, round_fail_mem = 0, round_fail_purify_mem = 0;
+        // 每條 link 的 purification 詳細資訊
+        struct LinkPurifyDetail {
+            int u, v;           // link 端點
+            int rounds;         // purify 輪數 (0=不做)
+            double raw_f;       // 原始 F_init
+            double raw_w;       // 原始 Werner = (4F-1)/3
+            double purified_w;  // purify 後的 Werner
+            double purified_f;  // purify 後的 Fidelity = (3W+1)/4
+        };
         // purification 前後 fidelity/prob 記錄
         struct PurifyLogEntry {
             int src, dst, hop;
             bool has_purify;
             double fid_before, werner_before, prob_before, fidprob_before;
             double fid_after, werner_after, prob_after, fidprob_after;
+            vector<LinkPurifyDetail> link_details;
         };
         vector<PurifyLogEntry> purify_log_entries;
 
@@ -544,10 +554,31 @@ void WernerAlgo2::run() {
                     double werner_no_pur = (4.0 * fid_no_pur - 1.0) / 3.0;
                     double werner_with_pur = (4.0 * fid_with_pur - 1.0) / 3.0;
 
+                    // 收集每條 link 的 purify 詳細資訊
+                    vector<LinkPurifyDetail> link_details;
+                    vector<int> pur_rounds = shape.get_link_purify_rounds();
+                    for (size_t li = 0; li < sv.size() - 1; ++li) {
+                        int u = sv[li].first, v = sv[li+1].first;
+                        int rounds = (li < pur_rounds.size()) ? pur_rounds[li] : 0;
+                        double raw_f = graph.get_F_init(u, v);
+                        double raw_w = (4.0 * raw_f - 1.0) / 3.0;
+                        double w_cur = raw_w;
+                        if (rounds > 0) {
+                            for (int r = 0; r < rounds; r++) {
+                                double num = 3.0L * w_cur * raw_w + 3.0L * w_cur + 3.0L * raw_w - 1.0L;
+                                double den = 9.0L * w_cur * raw_w - 3.0L * w_cur - 3.0L * raw_w + 5.0L;
+                                w_cur = num / den;
+                            }
+                        }
+                        double purified_f = (3.0 * w_cur + 1.0) / 4.0;
+                        link_details.push_back({u, v, rounds, raw_f, raw_w, w_cur, purified_f});
+                    }
+
                     purify_log_entries.push_back({
                         src, dst, hop, has_purify,
                         fid_no_pur, werner_no_pur, prob_no_pur, fid_no_pur * prob_no_pur,
-                        fid_with_pur, werner_with_pur, prob_with_pur, fid_with_pur * prob_with_pur
+                        fid_with_pur, werner_with_pur, prob_with_pur, fid_with_pur * prob_with_pur,
+                        link_details
                     });
                 }
             }
@@ -591,6 +622,14 @@ void WernerAlgo2::run() {
                              << "  werner=" << e.werner_after
                              << "  prob=" << e.prob_after
                              << "  fid*prob=" << e.fidprob_after << endl;
+                    // 每條 link 的 purify 詳細資訊
+                    for (auto& lk : e.link_details) {
+                        log_file << "      link(" << lk.u << "->" << lk.v << ")"
+                                 << " purify_rounds=" << lk.rounds
+                                 << "  F: " << lk.raw_f << " -> " << lk.purified_f
+                                 << "  W: " << lk.raw_w << " -> " << lk.purified_w
+                                 << endl;
+                    }
                 }
                 log_file << "-----------------" << endl;
                 log_file.close();
