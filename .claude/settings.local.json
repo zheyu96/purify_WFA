@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./a.out)",
+      "Bash(echo \"exit: $?\")",
+      "Read(//tmp/**)",
+      "Bash(mkdir -p ../data/ans ../data/log ../data/input)",
+      "Bash(\"c:/Users/USER/Desktop/lab/ICC26/werner_cur_version/src/a.out\")",
+      "Bash(echo \"exit=$?\")",
+      "Bash(python graph_generator.py ../data/input/round_0.input 100 0.010000 0.045000 8)",
+      "Bash(rm -f ../data/input/*)",
+      "Bash(cp a.out a.exe)",
+      "Bash(./a.exe)",
+      "Bash(ldd a.out)"
+    ]
+  }
+}

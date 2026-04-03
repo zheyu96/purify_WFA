@@ -53,14 +53,12 @@ if len(sys.argv) <= 2:
 
 filename = sys.argv[1]
 num_of_node = int(sys.argv[2])
-# min_memory_cnt = int(sys.argv[3])
-# max_memory_cnt = int(sys.argv[4])
-# min_fidelity = float(sys.argv[5])
-# max_fidelity = float(sys.argv[6])
-# entangle_lambda = float(sys.argv[3])
-# tao = float(sys.argv[4])
-# entangle_time = float(sys.argv[5])
-# entangle_prob = float(sys.argv[3])
+# Paper Eq.2: Fe(u,v) = 1/4 + 3/4 * exp(-gamma * l(u,v))
+#   fid_ratio = exp(-gamma * l)，之後在 Graph.cpp 中做 min/max 縮放
+# Paper Eq.13: Pr(u,v) = 1 - (1 - exp(-lambda * l(u,v)))^xi
+gamma = float(sys.argv[3]) if len(sys.argv) > 3 else 0.01
+entangle_lambda_param = float(sys.argv[4]) if len(sys.argv) > 4 else 0.045
+xi = int(sys.argv[5]) if len(sys.argv) > 5 else 8
 
 print("======== generating graph ========", file=sys.stderr)
 print("filename =", filename, file=sys.stderr)
@@ -130,13 +128,16 @@ with open(path, 'w') as f:
             #    ratio = 0.95
             #if ratio < 0.55:
             #    ratio = 0.55
-            ratio = random.uniform(0.9, 0.95)
-            if ratio > 0.98:
-                ratio = 0.98
-            if ratio < 0.85:
-                ratio = 0.85
-            F = ratio
-            print(e0 + " " + e1 + " " + str(F), file=f)
+            # Paper Eq.2: fid_ratio = exp(-gamma * l), 寫入後由 Graph.cpp 做 min/max 縮放
+            fid_ratio = math.exp(-gamma * dis)
+            fid_ratio = max(0.01, min(0.99, fid_ratio))
+
+            # Paper Eq.13: Pr(u,v) = 1 - (1 - exp(-lambda * l))^xi
+            one_prob = math.exp(-entangle_lambda_param * dis)
+            entangle_prob = 1.0 - ((1.0 - one_prob) ** xi)
+            entangle_prob = max(0.001, min(0.999, entangle_prob))
+
+            print(e0 + " " + e1 + " " + str(entangle_prob) + " " + str(fid_ratio), file=f)
             avg_l += dis
     avg_l /= num_of_edge
 

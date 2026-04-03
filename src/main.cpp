@@ -378,13 +378,18 @@ int main(){
     // min_fidelity 降低使 w_e 落在 ~0.73-0.87，讓 3-4 hop 就需要 purify
     // fidelity_threshold 提高使 w_th 更嚴格，擴大甜蜜點範圍
     // 原始值: min_fidelity=0.89, fidelity_threshold=0.7
-    default_setting["min_fidelity"] = 0.78;
-    default_setting["max_fidelity"] = 0.93;
+    default_setting["min_fidelity"] = 0.70;
+    default_setting["max_fidelity"] = 0.95;
     default_setting["swap_prob"] = 0.9;
     // threshold=0.8: 平衡點 — purify 仍有優勢，同時比 0.85 寬鬆使更多 request 通過
-    default_setting["fidelity_threshold"] = 0.8;
+    default_setting["fidelity_threshold"] = 0.7;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
+    // Paper Eq.2: Fe = 1/4 + 3/4 * exp(-gamma * l)
+    // gamma 控制 fidelity 隨距離衰減的速度
+    default_setting["gamma"] = 0.01;
+    // Paper Eq.13: ξ = floor(δ / τ_att)，每 slot 嘗試 entangle 的次數
+    default_setting["xi"] = 8;
     default_setting["Zmin"]=0.02702867239;
     default_setting["bucket_eps"]=0.01;
     default_setting["time_eta"]=0.001;
@@ -433,8 +438,11 @@ int main(){
         string filename = file_path + "input/round_" + to_string(r) + ".input";
         string command = "python3 graph_generator.py ";
         double A = 0.25, B = 0.75, tao = default_setting["tao"], T = 10, n = 2;
-        // derandom
-        string parameter = to_string(num_nodes);
+        double gamma = default_setting["gamma"];
+        double entangle_lambda = default_setting["entangle_lambda"];
+        int xi = (int)default_setting["xi"];
+        // 傳遞 num_nodes, gamma, lambda, xi 給 graph_generator (Paper Eq.2 & Eq.13)
+        string parameter = to_string(num_nodes) + " " + to_string(gamma) + " " + to_string(entangle_lambda) + " " + to_string(xi);
         cerr << (command + filename + " " + parameter) << endl;
         if(system((command + filename + " " + parameter).c_str()) != 0){
             cerr<<"error:\tsystem proccess python error"<<endl;
@@ -551,7 +559,7 @@ int main(){
 
     // vector<string> X_names = {"time_limit", "request_cnt", "num_nodes", "avg_memory", "tao"};
     //vector<string> X_names = {"request_cnt"};
-    vector<string> X_names = { "request_cnt", "time_limit", "tao",  "fidelity_threshold" , "avg_memory","hop_count" };
+    vector<string> X_names = { "request_cnt", "time_limit", "tao", "fidelity_threshold", "avg_memory", "hop_count" };
     //vector<string> X_names = {"Zmin","bucket_eps","time_eta"};
     vector<string> Y_names = {"fidelity_gain", "succ_request_cnt"};
     vector<string> algo_names = {"ZFA_UB","ZFA2","ZFA","MyAlgo1", "MyAlgo2", "MyAlgo3"};
