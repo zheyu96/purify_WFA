@@ -371,7 +371,7 @@ int main(){
     default_setting["time_limit"] = 13;
     // avg_memory 必須夠緊張，讓演算法無法服務所有可行 request → 不同策略做不同取捨
     // 13/8: 太寬裕 → 所有非 purify 演算法結果一樣。5: 強制競爭
-    default_setting["avg_memory"] = 5;
+    default_setting["avg_memory"] = 10;
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 4;
     // === Purification 甜蜜點參數 ===
