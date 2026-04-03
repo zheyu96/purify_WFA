@@ -283,10 +283,10 @@ void MyAlgo2::run() {
             xim_sum += P.second;
             Shape shape(P.first);
             double fidelity = shape.get_fidelity(A, B, n, T, tao, graph.get_F_init());
-            fidelity = ((1.0 + fidelity * 9.0) / 10.0);
             if(fidelity + EPS > graph.get_fidelity_threshold()) {
-                res["fidelity_gain"] += P.second * (fidelity * graph.path_Pr(shape));
-                res["succ_request_cnt"] += P.second * (1 + 3 * graph.path_Pr(shape)) / 4;
+                double w = (4.0 * fidelity - 1.0) / 3.0;  // Werner parameter
+                res["fidelity_gain"] += P.second * (w * graph.path_Pr(shape));
+                res["succ_request_cnt"] += P.second * graph.path_Pr(shape);
             }
 
             for(auto id_mem : P.first) {
@@ -303,10 +303,12 @@ void MyAlgo2::run() {
         max_xim_sum = max(max_xim_sum, xim_sum);
     }
 
-    res["succ_request_cnt"] = max(res["succ_request_cnt"] / max_xim_sum, (double)graph.get_succ_request_cnt() * 1.1001);
-    res["fidelity_gain"] = max(res["fidelity_gain"] / max_xim_sum, (double)graph.get_fidelity_gain() * 1.1001);
-    // res["fidelity_gain"] = res["succ_request_cnt"];
-    res["utilization"] = (usage / ((double)memory_total_LP * (double)graph.get_time_limit())) / max_xim_sum;
-    res["pure_fidelity"] = max(graph.get_pure_fidelity()/max_xim_sum, (double)graph.get_pure_fidelity() * 1.1001);
+    // LP upper bound：用 LP 分數解直接算（不取 rounding 的 max）
+    if(max_xim_sum > EPS) {
+        res["fidelity_gain"] /= max_xim_sum;
+        res["succ_request_cnt"] /= max_xim_sum;
+    }
+    res["utilization"] = (max_xim_sum > EPS) ? (usage / ((double)memory_total_LP * (double)graph.get_time_limit())) / max_xim_sum : 0;
+    res["pure_fidelity"] = graph.get_pure_fidelity();
     cerr << "[" << algorithm_name << "] end" << endl;
 }
