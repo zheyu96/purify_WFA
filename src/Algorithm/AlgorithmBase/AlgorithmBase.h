@@ -25,7 +25,7 @@ protected:
     double pass_tao(double F);
     vector<Path> get_paths(int src, int dst);
 public:
-    AlgorithmBase(Graph graph, vector<SDpair> requests, map<SDpair, vector<Path>> paths);
+    AlgorithmBase(const Graph& graph, const vector<SDpair>& requests, const map<SDpair, vector<Path>>& paths);
     map<string, double> get_res();
     double get_res(string str);
     vector<double> get_cdf();

@@ -5,7 +5,7 @@
 
 using namespace std;
 
-WernerAlgo2::WernerAlgo2(Graph graph,vector<pair<int,int>> requests,map<SDpair, vector<Path>> paths): AlgorithmBase(graph, requests, paths)
+WernerAlgo2::WernerAlgo2(const Graph& graph,const vector<pair<int,int>>& requests,const map<SDpair, vector<Path>>& paths): AlgorithmBase(graph, requests, paths)
 {
     algorithm_name = "ZFA2";
 }
@@ -569,31 +569,34 @@ void WernerAlgo2::run() {
             requests.erase(requests.begin() + fin);
         }
 
-        // [新增] 將 purification 前後比較統計寫入檔案 (append 模式)
-        string log_file_path = "../data/log/ZFA2_Purification_Stats.txt";
-        ofstream log_file(log_file_path, ios::app);
+        // [新增] 將 purification 前後比較統計寫入檔案 (append 模式, omp critical 保護)
+        #pragma omp critical(zfa2_log_write)
+        {
+            string log_file_path = "../data/log/ZFA2_Purification_Stats.txt";
+            ofstream log_file(log_file_path, ios::app);
 
-        if (log_file.is_open()) {
-            if (!experiment_label.empty()) {
-                log_file << "=== Experiment: " << experiment_label << " ===" << endl;
+            if (log_file.is_open()) {
+                if (!experiment_label.empty()) {
+                    log_file << "=== Experiment: " << experiment_label << " ===" << endl;
+                }
+                log_file << "--- Accepted Requests (total: " << purify_log_entries.size() << ") ---" << endl;
+                for (auto& e : purify_log_entries) {
+                    log_file << "  SD=(" << e.src << "," << e.dst << ") hop=" << e.hop
+                             << " purified=" << (e.has_purify ? "YES" : "NO") << endl;
+                    log_file << "    [Before Purify] fidelity=" << e.fid_before
+                             << "  werner=" << e.werner_before
+                             << "  prob=" << e.prob_before
+                             << "  fid*prob=" << e.fidprob_before << endl;
+                    log_file << "    [After  Purify] fidelity=" << e.fid_after
+                             << "  werner=" << e.werner_after
+                             << "  prob=" << e.prob_after
+                             << "  fid*prob=" << e.fidprob_after << endl;
+                }
+                log_file << "-----------------" << endl;
+                log_file.close();
+            } else {
+                cerr << "[Warning] Unable to open log file: " << log_file_path << endl;
             }
-            log_file << "--- Accepted Requests (total: " << purify_log_entries.size() << ") ---" << endl;
-            for (auto& e : purify_log_entries) {
-                log_file << "  SD=(" << e.src << "," << e.dst << ") hop=" << e.hop
-                         << " purified=" << (e.has_purify ? "YES" : "NO") << endl;
-                log_file << "    [Before Purify] fidelity=" << e.fid_before
-                         << "  werner=" << e.werner_before
-                         << "  prob=" << e.prob_before
-                         << "  fid*prob=" << e.fidprob_before << endl;
-                log_file << "    [After  Purify] fidelity=" << e.fid_after
-                         << "  werner=" << e.werner_after
-                         << "  prob=" << e.prob_after
-                         << "  fid*prob=" << e.fidprob_after << endl;
-            }
-            log_file << "-----------------" << endl;
-            log_file.close();
-        } else {
-            cerr << "[Warning] Unable to open log file: " << log_file_path << endl;
         }
     }
     update_res();

@@ -19,7 +19,7 @@ class MyAlgo3 : public AlgorithmBase {
     Shape_vector backtracing_shape(int left, int right, int t, int state, vector<int> &path);
     Shape_vector backtracing_shape2(int left, int right, int t, int state, vector<int> &path);
 public:
-    MyAlgo3(Graph graph, vector<pair<int, int>> requests, map<SDpair, vector<Path>> paths);
+    MyAlgo3(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths);
     void run();
 };
 

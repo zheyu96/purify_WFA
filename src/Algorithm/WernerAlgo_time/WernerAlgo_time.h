@@ -28,9 +28,9 @@ using namespace std;
 class WernerAlgo_time : public AlgorithmBase {
 public:
     #define double long double
-    WernerAlgo_time(Graph graph,
-               vector<pair<int,int>> requests,
-               map<SDpair, vector<Path>> paths,double epsilon=0.35);
+    WernerAlgo_time(const Graph& graph,
+               const vector<pair<int,int>>& requests,
+               const map<SDpair, vector<Path>>& paths,double epsilon=0.35);
 
     void run();
 

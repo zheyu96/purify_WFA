@@ -21,7 +21,7 @@ class MyAlgo2 : public AlgorithmBase {
     Shape_vector recursion_find_shape(int left, int right, int t, vector<int> &path);
     int request_cnt;
 public:
-    MyAlgo2(Graph graph, vector<pair<int, int>> requests, map<SDpair, vector<Path>> paths);
+    MyAlgo2(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths);
     void run();
 };
 

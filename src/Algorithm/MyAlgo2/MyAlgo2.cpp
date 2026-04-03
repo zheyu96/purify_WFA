@@ -1,6 +1,6 @@
 #include "MyAlgo2.h"
 
-MyAlgo2::MyAlgo2(Graph graph, vector<pair<int, int>> requests, map<SDpair, vector<Path>> paths):
+MyAlgo2::MyAlgo2(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths):
     AlgorithmBase(graph, requests, paths) {
     algorithm_name = "MyAlgo2";
     // m = i + vt
@@ -10,20 +10,20 @@ MyAlgo2::MyAlgo2(Graph graph, vector<pair<int, int>> requests, map<SDpair, vecto
     // beta(v, t) = delta / C(v)
 
     epsilon = (0.85);
-    double m = requests.size() + (double)graph.get_num_nodes() * (double)graph.get_time_limit();
+    double m = this->requests.size() + (double)this->graph.get_num_nodes() * (double)this->graph.get_time_limit();
     double delta = (1 + epsilon) * (1.0 / pow((1 + epsilon) * m, 1.0 / epsilon));
     obj = m * delta;
     // cerr << "[MyAlgo2] delta = " << delta << endl;
-    x.resize(requests.size());
-    alpha.resize(requests.size(), delta);
-    beta.resize(graph.get_num_nodes(), vector<double>(graph.get_time_limit()));
+    x.resize(this->requests.size());
+    alpha.resize(this->requests.size(), delta);
+    beta.resize(this->graph.get_num_nodes(), vector<double>(this->graph.get_time_limit()));
 
-    for(int i = 0; i < graph.get_num_nodes(); i++) {
-        for(int t = 0; t < graph.get_time_limit(); t++) {
-            beta[i][t] = delta / graph.get_node_memory_at(i, t);
+    for(int i = 0; i < this->graph.get_num_nodes(); i++) {
+        for(int t = 0; t < this->graph.get_time_limit(); t++) {
+            beta[i][t] = delta / this->graph.get_node_memory_at(i, t);
         }
     }
-    request_cnt = (int)requests.size();
+    request_cnt = (int)this->requests.size();
 }
 
 

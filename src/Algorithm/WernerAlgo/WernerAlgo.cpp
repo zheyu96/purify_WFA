@@ -1,6 +1,6 @@
 #include "WernerAlgo.h"
 
-WernerAlgo::WernerAlgo(Graph graph,vector<pair<int,int>> requests,map<SDpair, vector<Path>> paths): AlgorithmBase(graph, requests, paths)
+WernerAlgo::WernerAlgo(const Graph& graph,const vector<pair<int,int>>& requests,const map<SDpair, vector<Path>>& paths): AlgorithmBase(graph, requests, paths)
 {
     algorithm_name = "ZFA";
 }

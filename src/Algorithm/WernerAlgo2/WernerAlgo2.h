@@ -28,9 +28,9 @@ using namespace std;
 class WernerAlgo2 : public AlgorithmBase {
 public:
     #define double long double
-    WernerAlgo2(Graph graph,
-               vector<pair<int,int>> requests,
-               map<SDpair, vector<Path>> paths);
+    WernerAlgo2(const Graph& graph,
+               const vector<pair<int,int>>& requests,
+               const map<SDpair, vector<Path>>& paths);
 
     void run();
     void set_experiment_label(const string& label) { experiment_label = label; }

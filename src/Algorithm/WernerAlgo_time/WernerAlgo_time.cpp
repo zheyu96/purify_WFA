@@ -1,6 +1,6 @@
 #include "WernerAlgo_time.h"
 
-WernerAlgo_time::WernerAlgo_time(Graph graph,vector<pair<int,int>> requests,map<SDpair, vector<Path>> paths,double epsilon): AlgorithmBase(graph, requests, paths)
+WernerAlgo_time::WernerAlgo_time(const Graph& graph,const vector<pair<int,int>>& requests,const map<SDpair, vector<Path>>& paths,double epsilon): AlgorithmBase(graph, requests, paths)
 {
     algorithm_name = "ZFA_time";
     this->epsilon=epsilon;

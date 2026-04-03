@@ -13,7 +13,7 @@ class MyAlgo4 : public AlgorithmBase {
     Shape_vector build_merge_shape(vector<int> path);
 
 public:
-    MyAlgo4(Graph graph, vector<pair<int, int>> requests, map<SDpair, vector<Path>> paths);
+    MyAlgo4(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths);
     void run();
 };
 

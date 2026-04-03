@@ -13,7 +13,7 @@ class MyAlgo6 : public AlgorithmBase {
     Shape_vector build_merge_shape(vector<int> path);
 
 public:
-    MyAlgo6(Graph graph, vector<pair<int, int>> requests, map<SDpair, vector<Path>> paths);
+    MyAlgo6(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths);
     void run();
 };
 

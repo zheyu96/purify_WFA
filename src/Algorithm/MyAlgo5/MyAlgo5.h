@@ -15,7 +15,7 @@ class MyAlgo5 : public AlgorithmBase {
     vector<vector<pair<int, int>>> recursion_build(int length);
     Shape_vector build_linear_shape(vector<int> path);
 public:
-    MyAlgo5(Graph graph, vector<pair<int, int>> requests, map<SDpair, vector<Path>> paths);
+    MyAlgo5(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths);
     void run();
 };
 

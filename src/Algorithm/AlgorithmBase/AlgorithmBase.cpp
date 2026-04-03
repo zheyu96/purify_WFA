@@ -1,15 +1,15 @@
 #include "AlgorithmBase.h"
 
-AlgorithmBase::AlgorithmBase(Graph graph, vector<SDpair> requests, map<SDpair, vector<Path>> paths):
+AlgorithmBase::AlgorithmBase(const Graph& graph, const vector<SDpair>& requests, const map<SDpair, vector<Path>>& paths):
     graph(graph), requests(requests), paths(paths) {
-    time_limit = graph.get_time_limit();
-    A = graph.get_A();
-    B = graph.get_B();
-    n = graph.get_n();
-    T = graph.get_T();
-    tao = graph.get_tao();
+    time_limit = this->graph.get_time_limit();
+    A = this->graph.get_A();
+    B = this->graph.get_B();
+    n = this->graph.get_n();
+    T = this->graph.get_T();
+    tao = this->graph.get_tao();
 
-    vector<bool> passed_node(graph.get_num_nodes(), false);
+    vector<bool> passed_node(this->graph.get_num_nodes(), false);
     memory_total = 0;
     // for(int i = 0; i < (int)requests.size(); i++) {
     //     int src = requests[i].first, dst = requests[i].second;
@@ -22,9 +22,9 @@ AlgorithmBase::AlgorithmBase(Graph graph, vector<SDpair> requests, map<SDpair, v
     //     }
     // }
 
-    memory_total *= graph.get_time_limit();
-    request_cnt = requests.size();
-    cdf.resize(graph.get_boundary().size(), request_cnt);
+    memory_total *= this->graph.get_time_limit();
+    request_cnt = this->requests.size();
+    cdf.resize(this->graph.get_boundary().size(), request_cnt);
 }
 AlgorithmBase::~AlgorithmBase() {
     if(DEBUG) cerr << "delete AlgorithmBase" << endl;

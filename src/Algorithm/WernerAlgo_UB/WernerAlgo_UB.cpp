@@ -5,7 +5,7 @@
 
 using namespace std;
 
-WernerAlgo_UB::WernerAlgo_UB(Graph graph,vector<pair<int,int>> requests,map<SDpair, vector<Path>> paths): AlgorithmBase(graph, requests, paths)
+WernerAlgo_UB::WernerAlgo_UB(const Graph& graph,const vector<pair<int,int>>& requests,const map<SDpair, vector<Path>>& paths): AlgorithmBase(graph, requests, paths)
 {
     algorithm_name = "ZFA_UB";
 }

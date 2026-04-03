@@ -28,9 +28,9 @@ using namespace std;
 class WernerAlgo_UB : public AlgorithmBase {
 public:
     #define double long double
-    WernerAlgo_UB(Graph graph,
-               vector<pair<int,int>> requests,
-               map<SDpair, vector<Path>> paths);
+    WernerAlgo_UB(const Graph& graph,
+               const vector<pair<int,int>>& requests,
+               const map<SDpair, vector<Path>>& paths);
 
     void run();
 

@@ -1,6 +1,6 @@
 #include "MyAlgo4.h"
 
-MyAlgo4::MyAlgo4(Graph _graph, vector<SDpair> _requests, map<SDpair, vector<Path>> _paths):
+MyAlgo4::MyAlgo4(const Graph& _graph, const vector<SDpair>& _requests, const map<SDpair, vector<Path>>& _paths):
     AlgorithmBase(_graph, _requests, _paths) {
     algorithm_name = "Merge";
     merge_shape.resize(graph.get_num_nodes() + 1);

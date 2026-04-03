@@ -1,6 +1,6 @@
 #include "MyAlgo5.h"
 
-MyAlgo5::MyAlgo5(Graph _graph, vector<SDpair> _requests, map<SDpair, vector<Path>> _paths):
+MyAlgo5::MyAlgo5(const Graph& _graph, const vector<SDpair>& _requests, const map<SDpair, vector<Path>>& _paths):
     AlgorithmBase(_graph, _requests, _paths) {
     algorithm_name = "Linear";
     linear_shape.resize(graph.get_num_nodes() + 1);

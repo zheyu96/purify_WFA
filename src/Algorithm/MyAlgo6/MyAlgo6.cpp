@@ -1,6 +1,6 @@
 #include "MyAlgo6.h"
 
-MyAlgo6::MyAlgo6(Graph _graph, vector<SDpair> _requests, map<SDpair, vector<Path>> _paths):
+MyAlgo6::MyAlgo6(const Graph& _graph, const vector<SDpair>& _requests, const map<SDpair, vector<Path>>& _paths):
     AlgorithmBase(_graph, _requests, _paths) {
     algorithm_name = "ASAP";
     merge_shape.resize(graph.get_num_nodes() + 1);
