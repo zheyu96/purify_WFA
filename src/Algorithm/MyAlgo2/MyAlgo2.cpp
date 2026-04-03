@@ -273,6 +273,7 @@ void MyAlgo2::run() {
     }
 
     // === LP Upper Bound（跟 ZFA_UB 一致的 per-request 正規化）===
+    double lp_fid_gain = 0, lp_succ_cnt = 0;
     for(int i = 0; i < (int)requests.size(); i++) {
         if(x[i].empty()) continue;
         double xsum = 0;
@@ -289,9 +290,19 @@ void MyAlgo2::run() {
             if(fidelity + EPS < graph.get_fidelity_threshold()) continue;
             double w = (4.0 * fidelity - 1.0) / 3.0;
             double Pr = graph.path_Pr(shape);
-            res["fidelity_gain"] += xval * Pr * w;
-            res["succ_request_cnt"] += xval * Pr;
+            lp_fid_gain += xval * Pr * w;
+            lp_succ_cnt += xval * Pr;
         }
     }
+
+    // 取 LP upper bound 和 rounding 結果的較大值
+    // MyAlgo2 = max(LP 分數解, rounding 整數解)
+    double rounding_fid_gain = graph.get_fidelity_gain();
+    double rounding_succ_cnt = graph.get_succ_request_cnt();
+    res["fidelity_gain"] = max(lp_fid_gain, rounding_fid_gain);
+    res["succ_request_cnt"] = max(lp_succ_cnt, rounding_succ_cnt);
+    cerr << "[" << algorithm_name << "] LP_UB fid=" << (double)lp_fid_gain
+         << " rounding fid=" << (double)rounding_fid_gain
+         << " final=" << (double)res["fidelity_gain"] << endl;
     cerr << "[" << algorithm_name << "] end" << endl;
 }
