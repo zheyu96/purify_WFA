@@ -423,7 +423,11 @@ void WernerAlgo3::run() {
                 ub_cnt++;
             }
         }
-        cerr << "[" << algorithm_name << "] UB(Eq.14a): fid_gain=" << (double)res["fidelity_gain"]
+        // 將 LP upper bound 放大 1.1 倍，作為更寬鬆的上界
+        res["fidelity_gain"] *= 1.1;
+        res["succ_request_cnt"] *= 1.1;
+
+        cerr << "[" << algorithm_name << "] UB(Eq.14a)*1.1: fid_gain=" << (double)res["fidelity_gain"]
              << " succ_req=" << (double)res["succ_request_cnt"]
              << " shapes=" << ub_cnt
              << " max_xsum=" << max_xsum << endl;
