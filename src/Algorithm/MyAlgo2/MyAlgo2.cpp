@@ -272,43 +272,26 @@ void MyAlgo2::run() {
         }
     }
 
-    double max_xim_sum = 0;
-    double usage = 0;
-
-    int memory_total_LP = 0;
-    vector<bool> passed_node(graph.get_num_nodes(), false);
+    // === LP Upper Bound（跟 ZFA_UB 一致的 per-request 正規化）===
     for(int i = 0; i < (int)requests.size(); i++) {
-        double xim_sum = 0;
-        for(auto P : x[i]) {
-            xim_sum += P.second;
+        if(x[i].empty()) continue;
+        double xsum = 0;
+        for(auto& P : x[i]) xsum += P.second;
+        if(xsum < 1e-12) continue;
+        // Eq.14b 正規化: scale down 使 Σ x ≤ 1
+        double scale = (xsum > 1.0) ? (1.0 / xsum) : 1.0;
+
+        for(auto& P : x[i]) {
+            double xval = P.second * scale;
+            if(xval < 1e-12) continue;
             Shape shape(P.first);
             double fidelity = shape.get_fidelity(A, B, n, T, tao, graph.get_F_init());
-            if(fidelity + EPS > graph.get_fidelity_threshold()) {
-                double w = (4.0 * fidelity - 1.0) / 3.0;  // Werner parameter
-                res["fidelity_gain"] += P.second * (w * graph.path_Pr(shape));
-                res["succ_request_cnt"] += P.second * graph.path_Pr(shape);
-            }
-
-            for(auto id_mem : P.first) {
-                int node = id_mem.first;
-                if(!passed_node[node]) {
-                    memory_total_LP += graph.get_node_memory(node);
-                    passed_node[node] = true;
-                }
-                for(pair<int, int> mem_range : id_mem.second) {
-                    usage += (mem_range.second - mem_range.first) * P.second;
-                }
-            }
+            if(fidelity + EPS < graph.get_fidelity_threshold()) continue;
+            double w = (4.0 * fidelity - 1.0) / 3.0;
+            double Pr = graph.path_Pr(shape);
+            res["fidelity_gain"] += xval * Pr * w;
+            res["succ_request_cnt"] += xval * Pr;
         }
-        max_xim_sum = max(max_xim_sum, xim_sum);
     }
-
-    // LP upper bound：用 LP 分數解直接算（不取 rounding 的 max）
-    if(max_xim_sum > EPS) {
-        res["fidelity_gain"] /= max_xim_sum;
-        res["succ_request_cnt"] /= max_xim_sum;
-    }
-    res["utilization"] = (max_xim_sum > EPS) ? (usage / ((double)memory_total_LP * (double)graph.get_time_limit())) / max_xim_sum : 0;
-    res["pure_fidelity"] = graph.get_pure_fidelity();
     cerr << "[" << algorithm_name << "] end" << endl;
 }
