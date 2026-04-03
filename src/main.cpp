@@ -388,7 +388,8 @@ int main(){
     default_setting["entangle_prob"] = 0.01;
     // Paper Eq.2: Fe = 1/4 + 3/4 * exp(-gamma * l)
     // gamma 控制 fidelity 隨距離衰減的速度
-    default_setting["gamma"] = 0.01;
+    // gamma 越大 → 長 edge 的 fidelity 衰減越快 → 更多 3-hop path 需要 purify
+    default_setting["gamma"] = 0.013;
     // Paper Eq.13: ξ = floor(δ / τ_att)，每 slot 嘗試 entangle 的次數
     default_setting["xi"] = 8;
     default_setting["Zmin"]=0.02702867239;
@@ -464,10 +465,10 @@ int main(){
         //     memory 吃重 → 不做 purify 的 MyAlgo1 省 memory 能塞更多
         int total_cnt = 200;
 
-        int cnt_A = (int)(total_cnt * 0.25);  // purify-needed → ZFA2
-        int cnt_B = (int)(total_cnt * 0.20);  // high-fid short → MyAlgo1/ZFA
-        int cnt_C = (int)(total_cnt * 0.20);  // marginal-fid → 選路區隔
-        int cnt_D = (int)(total_cnt * 0.20);  // diverse-path → MyAlgo3
+        int cnt_A = (int)(total_cnt * 0.40);  // purify-needed → ZFA2 (加大比例讓 purify 優勢明顯)
+        int cnt_B = (int)(total_cnt * 0.15);  // high-fid short → MyAlgo1/ZFA
+        int cnt_C = (int)(total_cnt * 0.15);  // marginal-fid → 選路區隔
+        int cnt_D = (int)(total_cnt * 0.15);  // diverse-path → MyAlgo3
         int cnt_E = total_cnt - cnt_A - cnt_B - cnt_C - cnt_D;  // long-path → MyAlgo1
 
         // (A) purify sweet spot: 只有 ZFA2 做 purify 能過 threshold
@@ -549,10 +550,10 @@ int main(){
             for (auto &[h, cnt] : hop_dist)
                 cerr << h << "hop=" << cnt << " ";
             cerr << endl
-                 << "  A(25%): purify-needed → ZFA2 leads" << endl
-                 << "  B(20%): hi-fid short → LP global opt (MyAlgo1/ZFA)" << endl
-                 << "  C(20%): marginal-fid → routing strategy differentiation" << endl
-                 << "  D(20%): diverse-path → adaptive scoring (MyAlgo3)" << endl
+                 << "  A(40%): purify-needed → ZFA2 leads" << endl
+                 << "  B(15%): hi-fid short → LP global opt (MyAlgo1/ZFA)" << endl
+                 << "  C(15%): marginal-fid → routing strategy differentiation" << endl
+                 << "  D(15%): diverse-path → adaptive scoring (MyAlgo3)" << endl
                  << "  E(15%): long-path → memory efficiency (MyAlgo1)" << endl
                  << "================================================"
                  << "\033[0m" << endl;
