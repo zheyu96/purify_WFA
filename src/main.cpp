@@ -378,11 +378,10 @@ int main(){
     // min_fidelity 降低使 w_e 落在 ~0.73-0.87，讓 3-4 hop 就需要 purify
     // fidelity_threshold 提高使 w_th 更嚴格，擴大甜蜜點範圍
     // 原始值: min_fidelity=0.89, fidelity_threshold=0.7
-    default_setting["min_fidelity"] = 0.70;
-    default_setting["max_fidelity"] = 0.95;
+    default_setting["min_fidelity"] = 0.80;
+    default_setting["max_fidelity"] = 0.98;
     default_setting["swap_prob"] = 0.9;
-    // threshold=0.8: 平衡點 — purify 仍有優勢，同時比 0.85 寬鬆使更多 request 通過
-    default_setting["fidelity_threshold"] = 0.7;
+    default_setting["fidelity_threshold"] = 0.8;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
     // Paper Eq.2: Fe = 1/4 + 3/4 * exp(-gamma * l)
