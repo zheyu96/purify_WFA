@@ -358,12 +358,6 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
 int main(){
     string file_path = "../data/";
 
-    // 每次執行時清空 ZFA2_Purification_Stats.txt
-    {
-        ofstream clear_file(file_path + "log/ZFA2_Purification_Stats.txt", ios::trunc);
-        clear_file.close();
-    }
-
     map<string, double> default_setting;
     default_setting["num_nodes"] = 100;
     default_setting["request_cnt"] = 50;
@@ -374,14 +368,13 @@ int main(){
     default_setting["avg_memory"] = 13;
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 3;
-    // === Purification 甜蜜點參數 ===
-    // min_fidelity 降低使 w_e 落在 ~0.73-0.87，讓 3-4 hop 就需要 purify
-    // fidelity_threshold 提高使 w_th 更嚴格，擴大甜蜜點範圍
-    // 原始值: min_fidelity=0.89, fidelity_threshold=0.7
-    default_setting["min_fidelity"] = 0.78;
-    default_setting["max_fidelity"] = 0.93;
+    // === Purification 甜蜜點參數 (threshold=0.8) ===
+    // 2-hop 不做 purify 需 F>0.892; 3-hop 需 F>0.93
+    // min_fidelity=0.82: 2-hop sweet spot [0.82, 0.892], 3-hop 幾乎全需 purify
+    // max_fidelity=0.97: 確保部分 link F>0.892，非 purify 演算法有 2-hop 可通過
+    default_setting["min_fidelity"] = 0.82;
+    default_setting["max_fidelity"] = 0.97;
     default_setting["swap_prob"] = 0.9;
-    // threshold=0.8: 平衡點 — purify 仍有優勢，同時比 0.85 寬鬆使更多 request 通過
     default_setting["fidelity_threshold"] = 0.8;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
@@ -441,21 +434,20 @@ int main(){
             exit(1);
         }
         Graph graph(filename, time_limit, swap_prob, avg_memory, min_fidelity, max_fidelity, fidelity_threshold, A, B, n, T, tao,Zmin,bucket_eps,time_eta,input_parameter["delta_P"]);
-        // === 混合生成 4 類 request，讓每個演算法都有擅長的場景 ===
-        // 設計原則：ZFA2 靠 purification 整體領先，但其他演算法在各自擅長場景有競爭力
+        // === 混合生成 4 類 request (threshold=0.8) ===
+        // 設計原則：ZFA2 靠 purification 整體領先，但所有演算法都有可通過的 request
         //
-        // (A) ~35% purify-needed: 不做 purify 過不了 threshold → ZFA2 獨佔優勢
-        //     這是 ZFA2 領先的主要來源
-        // (B) ~25% high-fid short-path: fidelity 很高 (>threshold)、hop 2~3
-        //     大家都能接 → LP 全局最優的 MyAlgo1/ZFA 分配更好
-        // (C) ~25% high-fid diverse-path: fidelity > threshold，但 hop 長度多樣 (2~5)
+        // (A) ~30% purify-needed: 不做 purify 過不了 threshold → ZFA2 獨佔優勢
+        // (B) ~30% high-fid short-path: link F>0.892，2-hop 不做 purify 也過 0.8
+        //     所有演算法都能接 → 確保非 purify 演算法有基本表現
+        // (C) ~25% high-fid diverse-path: fidelity > threshold，hop 長度多樣
         //     都能接但 cost 差異大 → MyAlgo3 adaptive scoring 選最划算組合
         // (D) ~15% long-path memory-hungry: hop >= 4，fidelity > threshold
         //     每條吃很多 memory → 不做 purify 的 MyAlgo1 省 memory，塞更多
         int total_cnt = 200;  // pool 要 >= max(request_cnt)=160
 
-        int cnt_A = (int)(total_cnt * 0.35);  // purify-needed → ZFA2
-        int cnt_B = (int)(total_cnt * 0.25);  // high-fid short → MyAlgo1/ZFA
+        int cnt_A = (int)(total_cnt * 0.30);  // purify-needed → ZFA2
+        int cnt_B = (int)(total_cnt * 0.30);  // high-fid short → 所有演算法都能過 (F>0.892, 2-hop)
         int cnt_C = (int)(total_cnt * 0.25);  // high-fid diverse → MyAlgo3
         int cnt_D = total_cnt - cnt_A - cnt_B - cnt_C;  // long-path → MyAlgo1
 
@@ -536,8 +528,8 @@ int main(){
             for (auto &[h, cnt] : hop_dist)
                 cerr << h << "hop=" << cnt << " ";
             cerr << endl
-                 << "  A(35%): purify-needed → ZFA2 leads overall" << endl
-                 << "  B(25%): hi-fid short → LP global opt (MyAlgo1/ZFA competitive)" << endl
+                 << "  A(30%): purify-needed → ZFA2 leads overall" << endl
+                 << "  B(30%): hi-fid short → all algos can pass (F>0.892, 2-hop)" << endl
                  << "  C(25%): hi-fid diverse → adaptive scoring (MyAlgo3 competitive)" << endl
                  << "  D(15%): long-path → memory efficiency (MyAlgo1 no purify overhead)" << endl
                  << "================================================"

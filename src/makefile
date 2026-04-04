@@ -47,6 +47,7 @@ runtime: runtime.cpp $(dependency) $(algorithm2) $(routing)
 # 4. 預設主程式目標 (包含 MyAlgo 1-6)
 a.out: main.cpp $(dependency) $(algorithm) $(routing)
 	g++ -fopenmp $(gcc_flag) main.cpp $(dependency) $(algorithm) $(routing) $(gurobi_flag) -o a.out
+	> ../data/log/ZFA2_Purification_Stats.txt
 	./a.out
 
 # --- 各個物件檔案 (Object Files) 編譯規則 ---
