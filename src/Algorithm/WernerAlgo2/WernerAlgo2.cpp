@@ -535,8 +535,8 @@ void WernerAlgo2::run() {
                 }
                 finished.push_back(request_index);
 
-                // [新增] 收集 purification 前後的 fidelity 與 prob 統計
-                {
+                // [新增] 收集 purification 前後的 fidelity 與 prob 統計（僅記錄有 purify 的）
+                if(has_purify) {
                     // 計算不開放 purify 的 fidelity 和 prob
                     Shape shape_no_pur(P.second);  // 不帶 purify rounds 的 shape
                     double fid_no_pur = shape_no_pur.get_fidelity(A, B, n, T, tao, graph.get_F_init(), false);
