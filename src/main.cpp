@@ -544,7 +544,7 @@ int main(){
     vector<string> X_names = { "request_cnt", "time_limit", "tao",  "fidelity_threshold" , "avg_memory","hop_count" };
     //vector<string> X_names = {"Zmin","bucket_eps","time_eta"};
     vector<string> Y_names = {"fidelity_gain", "succ_request_cnt"};
-    vector<string> algo_names = {"ZFA_UB","ZFA2","ZFA","MyAlgo1", "MyAlgo2", "MyAlgo3"};
+    vector<string> algo_names = {"ZFA_UB","ZFA2","MyAlgo1", "MyAlgo3"};
     // init result
 
 
@@ -692,14 +692,9 @@ int main(){
                         zfa2->set_experiment_label(exp_label);
                         algorithms.emplace_back(zfa2);
                     }
-                    algorithms.emplace_back(new WernerAlgo(graph,requests,paths));
                     if(X_name!="Zmin"&&X_name!="bucket_eps"&&X_name!="time_eta"){
                         algorithms.emplace_back(new MyAlgo1(graph, requests, paths));
-                        algorithms.emplace_back(new MyAlgo2(graph, requests, paths));
                         algorithms.emplace_back(new MyAlgo3(graph, requests, paths));
-                        /* algorithms.emplace_back(new MyAlgo4(graph, requests, paths));
-                        algorithms.emplace_back(new MyAlgo5(graph, requests, paths));
-                        algorithms.emplace_back(new MyAlgo6(graph, requests, paths)); */
                     }
 
 
