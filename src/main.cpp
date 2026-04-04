@@ -368,14 +368,14 @@ int main(){
     default_setting["avg_memory"] = 13;
     default_setting["tao"] = 0.002;
     default_setting["path_length"] = 3;
-    // === Purification 甜蜜點參數 (threshold=0.8) ===
-    // 2-hop 不做 purify 需 F>0.892; 3-hop 需 F>0.93
-    // min_fidelity=0.82: 2-hop sweet spot [0.82, 0.892], 3-hop 幾乎全需 purify
-    // max_fidelity=0.97: 確保部分 link F>0.892，非 purify 演算法有 2-hop 可通過
-    default_setting["min_fidelity"] = 0.82;
-    default_setting["max_fidelity"] = 0.97;
+    // === Purification 甜蜜點參數 (threshold=0.7) ===
+    // 2-hop 不做 purify 需 F>0.833; 3-hop 需 F>0.89
+    // min_fidelity=0.75: 2-hop sweet spot [0.75, 0.833], purify 1 round 即可過
+    // max_fidelity=0.93: 部分 link F>0.833，非 purify 演算法 2-hop 可通過
+    default_setting["min_fidelity"] = 0.75;
+    default_setting["max_fidelity"] = 0.93;
     default_setting["swap_prob"] = 0.9;
-    default_setting["fidelity_threshold"] = 0.8;
+    default_setting["fidelity_threshold"] = 0.7;
     default_setting["entangle_time"] = 0.00025;
     default_setting["entangle_prob"] = 0.01;
     default_setting["Zmin"]=0.02702867239;
@@ -401,7 +401,7 @@ int main(){
     //change_parameter["Zmin"]={0.028,0.150,0.272,0.394,0.518};
     change_parameter["bucket_eps"]={0.00001,0.0001,0.001,0.01,0.1};
     change_parameter["time_eta"]={0.00001,0.0001,0.001,0.01,0.1};
-    int round = 10;
+    int round = 1;
     vector<vector<SDpair>> default_requests(round);
     #pragma omp parallel for
     for(int r = 0; r < round; r++) {
