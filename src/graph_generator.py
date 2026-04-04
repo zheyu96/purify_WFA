@@ -130,15 +130,13 @@ with open(path, 'w') as f:
             #    ratio = 0.95
             #if ratio < 0.55:
             #    ratio = 0.55
-            # 80% link 在 sweet spot (需 purify), 20% 高 fid (非 purify 也能過)
-            if random.random() < 0.8:
-                ratio = random.uniform(0.2, 0.6)   # → F_init ∈ [0.83, 0.89], 需 purify
-            else:
-                ratio = random.uniform(0.7, 0.95)   # → F_init ∈ [0.905, 0.9425], 不需 purify
-            if ratio > 0.98:
+            # 70% link 在 sweet spot (需 purify), 30% 高 fid (非 purify 也能過)
+            # F_init = ratio * 0.15 + 0.80, 最低 F_init >= 0.80 (ratio >= 0)
+            ratio = random.uniform(0.75, 0.99)
+            if ratio > 0.99:
                 ratio = 0.98
-            if ratio < 0.2:
-                ratio = 0.2
+            if ratio < 0.75:
+                ratio = 0.75
             F = ratio
             print(e0 + " " + e1 + " " + str(F), file=f)
             avg_l += dis
