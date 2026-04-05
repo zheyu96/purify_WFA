@@ -40,42 +40,85 @@ void WernerAlgo2::variable_initialize() {
             beta[v][t] = (cap == 0) ? INF : (delta / cap);
         }
     }
+
+    oracle_cache.clear();
+    oracle_cache.resize(requests.size());
+    for (int i = 0; i < (int)requests.size(); i++)
+        oracle_cache[i].resize(get_paths(requests[i].first, requests[i].second).size());
+    dirty_nodes.clear();
+    dirty_alpha_idxs.clear();
 }
 
 Shape_vector WernerAlgo2::separation_oracle(){
-    // 針對每個 request 找最小成本 shape，選最好的回傳
     double most_violate=1e9;
-    bool flag=0;
     Shape_vector todo_shape;
     vector<int> best_purify_rounds;
-    for(int i=0;i<requests.size();i++){
+
+    for(int i=0;i<(int)requests.size();i++){
         int src=requests[i].first,dst=requests[i].second;
-        vector<Path> paths=get_paths(src,dst);
-        for(int p=0;p<paths.size();p++){
-            // Example initialization: adjust T and n as needed for your context
+        const vector<Path>& cur_paths=get_paths(src,dst);
+
+        for(int p=0;p<(int)cur_paths.size();p++){
+            auto& cache = oracle_cache[i][p];
+
+            if(cache.valid && !dirty_alpha_idxs.count(i)){
+                bool path_dirty = false;
+                for(int v : cur_paths[p]){
+                    if(dirty_nodes.count(v)){ path_dirty = true; break; }
+                }
+                if(!path_dirty){
+                    if(cache.best_score < most_violate){
+                        most_violate = cache.best_score;
+                        todo_shape = cache.shape;
+                        best_purify_rounds = cache.purify_rounds;
+                    }
+                    continue;
+                }
+            }
+
+            // Full recompute
             int T=dpp.T+5;
-            int n=paths[p].size()+5;
+            int n=cur_paths[p].size()+5;
             DP_table.clear();
             DP_table.resize(T);
-            for(int i=0;i<DP_table.size();i++){
-                DP_table[i].resize(n);
-                for(int j=0;j<DP_table[i].size();j++)
-                    DP_table[i][j].resize(n);
+            for(int ii=0;ii<(int)DP_table.size();ii++){
+                DP_table[ii].resize(n);
+                for(int j=0;j<(int)DP_table[ii].size();j++)
+                    DP_table[ii][j].resize(n);
             }
+
+            double local_best_J = 1e18;
+            ZLabel local_best_label;
+
             for(int t=1;t<=dpp.T;t++){
-                run_dp_in_t(paths[p],dpp,t);
-                auto cur_val=eval_best_J(0,paths[p].size()-1,t,alpha[i]);
-                if(cur_val.first<most_violate){
-                    most_violate=cur_val.first;
-                    vector<int> cur_rounds;
-                    todo_shape=backtrack_shape(cur_val.second,paths[p],cur_rounds);
-                    best_purify_rounds=cur_rounds;
+                run_dp_in_t(cur_paths[p],dpp,t);
+                auto cur_val=eval_best_J(0,cur_paths[p].size()-1,t,alpha[i]);
+                if(cur_val.first < local_best_J){
+                    local_best_J = cur_val.first;
+                    local_best_label = cur_val.second;
+                }
+            }
+
+            if(local_best_J < 1e18){
+                vector<int> cur_rounds;
+                cache.shape = backtrack_shape(local_best_label, cur_paths[p], cur_rounds);
+                cache.purify_rounds = cur_rounds;
+                cache.best_score = local_best_J;
+                cache.valid = true;
+
+                if(local_best_J < most_violate){
+                    most_violate = local_best_J;
+                    todo_shape = cache.shape;
+                    best_purify_rounds = cur_rounds;
                 }
             }
         }
     }
+
+    dirty_nodes.clear();
+    dirty_alpha_idxs.clear();
+
     if(!todo_shape.empty()){
-        // 只在尚無紀錄或新的有 purification 時才更新，避免 CONT 路徑覆寫掉 purified 版本
         auto it = shape_purify_map.find(todo_shape);
         if(it == shape_purify_map.end()){
             shape_purify_map[todo_shape] = best_purify_rounds;
@@ -381,6 +424,7 @@ void WernerAlgo2::run() {
                     }
                 }
                 if(req_idx==-1) break;
+                dirty_alpha_idxs.insert(req_idx);
                 x[req_idx][shape]+=q;
                 double ori=alpha[req_idx];
                 alpha[req_idx]=alpha[req_idx]*(1+epsilon*q);
@@ -397,6 +441,10 @@ void WernerAlgo2::run() {
                     obj += (beta[node_id][t] - original) * graph.get_node_memory_at(node_id, t);
                 }
             }
+
+            // Mark dirty nodes for incremental oracle
+            for(int i=0;i<(int)shape.size();i++)
+                dirty_nodes.insert(shape[i].first);
         }
         cerr << "[" << algorithm_name << "] LP done, " << it << " oracle calls" << endl;
         vector<pair<double, Shape_vector>> shapes;

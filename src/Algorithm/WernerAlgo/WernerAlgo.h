@@ -78,8 +78,16 @@ private:
     int split_dis(int s,int d,WernerAlgo::ZLabel& L);
     pair<double,WernerAlgo::ZLabel> eval_best_J(int s, int d, int t, double alp);
 
-private:
-    // 你可在此添加暫存/緩衝成員
+    // --- Oracle cache for incremental separation_oracle ---
+    struct OracleCache {
+        double best_score = 1e18;  // cached J / path_Pr
+        double path_pr = 0;
+        Shape_vector shape;
+        bool valid = false;
+    };
+    vector<vector<OracleCache>> oracle_cache;
+    set<int> dirty_nodes;
+    set<int> dirty_alpha_idxs;  // alpha 被更新的 request indices
 };
 
 #endif // __WERNER_ALGO_H

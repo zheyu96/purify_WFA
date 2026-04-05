@@ -78,6 +78,17 @@ private:
 
     ZLabel gen_leaf_label(int s,int e,int st,int tlen,int path_a,int path_b);
     map<Shape_vector, vector<int>> shape_purify_map;
+
+    // --- Oracle cache for incremental separation_oracle ---
+    struct OracleCache {
+        double best_score = 1e18;
+        Shape_vector shape;
+        vector<int> purify_rounds;
+        bool valid = false;
+    };
+    vector<vector<OracleCache>> oracle_cache;
+    set<int> dirty_nodes;
+    set<int> dirty_alpha_idxs;
 };
 
 #endif // __WERNER_ALGO3_H

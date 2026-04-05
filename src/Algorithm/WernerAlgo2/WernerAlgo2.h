@@ -94,6 +94,17 @@ private:
     // 暫存最近一次 oracle 回傳 shape 對應的 purify rounds
     map<Shape_vector, vector<int>> shape_purify_map;
     string experiment_label;  // 目前實驗的標籤 (例如 "request_cnt=80")
+
+    // --- Oracle cache for incremental separation_oracle ---
+    struct OracleCache {
+        double best_score = 1e18;
+        Shape_vector shape;
+        vector<int> purify_rounds;
+        bool valid = false;
+    };
+    vector<vector<OracleCache>> oracle_cache;
+    set<int> dirty_nodes;
+    set<int> dirty_alpha_idxs;
 };
 
 #endif // __WERNER_ALGO2_H
