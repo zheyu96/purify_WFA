@@ -389,7 +389,7 @@ int main(){
     change_parameter["min_fidelity"] = {0.6, 0.7, 0.8, 0.9, 0.95};
     change_parameter["avg_memory"] = {4, 6, 8, 10, 12, 16, 20};
     // change_parameter["tao"] = {0.3, 0.4, 0.5, 0.6, 0.7};
-    change_parameter["tao"] = {0.0015, 0.00175, 0.002,0.00225,0.0025};
+    change_parameter["tao"] = {0.0015, 0.00175, 0.002,0.00225,0.0025,0.005,0.0075,0.01,0.015,0.02,0.03,0.04,0.05};
     change_parameter["path_length"] = {3, 6, 9, 12, 15};
     change_parameter["swap_prob"] = {0.6, 0.7, 0.8, 0.9,0.95};
     change_parameter["fidelity_threshold"] = {0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85,0.9,0.95};
@@ -541,7 +541,7 @@ int main(){
 
     // vector<string> X_names = {"time_limit", "request_cnt", "num_nodes", "avg_memory", "tao"};
     //vector<string> X_names = {"request_cnt"};
-    vector<string> X_names = { "request_cnt", "time_limit", "tao",  "fidelity_threshold" , "avg_memory","hop_count" };
+    vector<string> X_names = { "request_cnt", "time_limit", "tao",  "fidelity_threshold" , "avg_memory","hop_count","swap_prob" };
     //vector<string> X_names = {"Zmin","bucket_eps","time_eta"};
     vector<string> Y_names = {"fidelity_gain", "succ_request_cnt"};
     vector<string> algo_names = {"ZFA_UB","ZFA2","MyAlgo1", "MyAlgo3"};
