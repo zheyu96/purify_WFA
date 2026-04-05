@@ -18,8 +18,8 @@ class MyAlgo1 : public AlgorithmBase {
     void variable_initialize();
     Shape_vector separation_oracle();
     pair<Shape_vector, double> find_min_shape(int src, int dst, double alp);
-    double recursion_calculate_min_shape(int left, int right, int t, vector<int> &path);
-    Shape_vector recursion_find_shape(int left, int right, int t, vector<int> &path);
+    double recursion_calculate_min_shape(int left, int right, int t, const vector<int> &path);
+    Shape_vector recursion_find_shape(int left, int right, int t, const vector<int> &path);
 public:
     MyAlgo1(const Graph& graph, const vector<pair<int, int>>& requests, const map<SDpair, vector<Path>>& paths);
     void run();

@@ -24,7 +24,7 @@ private:
     // 每條 link 的 purification 輪數（大小 = node數-1），空代表不啟用
     vector<int> link_purify_rounds;
 
-    double recursion_get_fidelity(int left, int right, map<pair<int, int> , double> &F_init);
+    double recursion_get_fidelity(int left, int right, const map<pair<int, int> , double> &F_init);
     // void check_valid(); // <--- 原本在這裡 (private)，導致錯誤
     void recursion_check(int left, int right);
     
@@ -40,12 +40,12 @@ public:
     Shape(Shape_vector _node_mem_range, vector<int> _link_purify_rounds);
     Shape();
 
-    Shape_vector get_node_mem_range();
-    vector<int> get_link_purify_rounds();
+    const Shape_vector& get_node_mem_range() const;
+    const vector<int>& get_link_purify_rounds() const;
 
     // [修改] 這裡的宣告必須包含新的參數 bool enable_purification
-    double get_fidelity(double _A, double _B, double _n, double _T, double _tao, 
-                        map<pair<int, int> , double> F_init, bool enable_purification = false);
+    double get_fidelity(double _A, double _B, double _n, double _T, double _tao,
+                        const map<pair<int, int> , double>& F_init, bool enable_purification = false);
 
     // [修正] 將 check_valid 移動到 public 區域
     void check_valid(); 

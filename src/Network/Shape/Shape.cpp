@@ -14,17 +14,17 @@ Shape::Shape(Shape_vector _node_mem_range, vector<int> _link_purify_rounds):
 
 Shape::Shape() {}
 
-Shape_vector Shape::get_node_mem_range() {
+const Shape_vector& Shape::get_node_mem_range() const {
     return node_mem_range;
 }
 
-vector<int> Shape::get_link_purify_rounds() {
+const vector<int>& Shape::get_link_purify_rounds() const {
     return link_purify_rounds;
 }
 
 // [修改 1] 函式定義必須包含 bool enable_purification (注意：這裡不寫預設值 = false，預設值只寫在 .h)
-double Shape::get_fidelity(double _A, double _B, double _n, double _T, double _tao, 
-                           map<pair<int, int> , double> F_init, bool enable_purification) {
+double Shape::get_fidelity(double _A, double _B, double _n, double _T, double _tao,
+                           const map<pair<int, int> , double>& F_init, bool enable_purification) {
     A = _A, B = _B, n = _n, T = _T, tao = _tao;
     
     // [修改 2] 將傳入的參數存入成員變數，這樣 recursion_get_fidelity 才能讀到
@@ -35,10 +35,10 @@ double Shape::get_fidelity(double _A, double _B, double _n, double _T, double _t
     return recursion_get_fidelity(0, (int)node_mem_range.size() - 1, F_init);
 }
 
-double Shape::recursion_get_fidelity(int left, int right, map<pair<int, int> , double> &F_init) {
+double Shape::recursion_get_fidelity(int left, int right, const map<pair<int, int> , double> &F_init) {
     // Base Case: 葉節點 (Link)
     if(left == right - 1) {
-        double raw_f = F_init[{node_mem_range[left].first, node_mem_range[right].first}];
+        double raw_f = F_init.at({node_mem_range[left].first, node_mem_range[right].first});
 
         // 若有提供 link_purify_rounds 且該 link 有 purification，使用正確輪數 (論文 Eq.7-8)
         int rounds = 0;

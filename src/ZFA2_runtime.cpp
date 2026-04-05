@@ -139,7 +139,7 @@ int main() {
 
                 Greedy path_method;
                 path_method.build_paths(graph, default_requests[r]);
-                auto paths = path_method.get_paths();
+                const auto& paths = path_method.get_paths();
 
                 // --- 執行 WernerAlgo2_time (ZFA2) ---
                 AlgorithmBase* algo2 = new WernerAlgo2_time(graph, default_requests[r], paths, 

@@ -49,7 +49,7 @@ pair<Shape_vector, double> MyAlgo2::find_min_shape(int src, int dst, double alp)
     
     Shape_vector best_shape;
     double best_cost = INF;
-    for(Path path : paths) {
+    for(const Path& path : paths) {
 
         dp.clear();
         dp.resize(path.size());
@@ -90,7 +90,7 @@ pair<Shape_vector, double> MyAlgo2::find_min_shape(int src, int dst, double alp)
     if(best_cost == -1) return {{}, INF};
     return {best_shape, best_cost};
 }
-double MyAlgo2::recursion_calculate_min_shape(int left, int right, int t, vector<int> &path) {
+double MyAlgo2::recursion_calculate_min_shape(int left, int right, int t, const vector<int> &path) {
     if(t <= 0) return INF;
     // cerr << left << " " << right << " " << t << " " << (int)path.size() << endl;
 
@@ -117,7 +117,7 @@ double MyAlgo2::recursion_calculate_min_shape(int left, int right, int t, vector
     par[left][right][t] = best_k;
     return dp[left][right][t] = best + beta[left_id][t] + beta[right_id][t];
 }
-Shape_vector MyAlgo2::recursion_find_shape(int left, int right, int t, vector<int> &path) {
+Shape_vector MyAlgo2::recursion_find_shape(int left, int right, int t, const vector<int> &path) {
     int left_id = path[left], right_id = path[right], k = par[left][right][t];
     if(left == right - 1 && k == -2) {
         Shape_vector result;

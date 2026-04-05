@@ -11,7 +11,7 @@ pair<Shape, double> MyAlgo3::calculate_best_shape(int src, int dst) {
     
     Shape best_shape;
     double best_fidelity = -1;
-    for(Path path : paths) {
+    for(const Path& path : paths) {
         double path_prob = graph.path_Pr(path);
         dp.clear();
         dp.resize(path.size());
@@ -70,7 +70,7 @@ pair<Shape, double> MyAlgo3::calculate_best_shape2(int src, int dst) {
 
     Shape best_shape;
     double best_value = INF;
-    for(Path path : paths) {
+    for(const Path& path : paths) {
         dp2.clear();
         dp2.resize(path.size());
         caled2.clear();
@@ -119,7 +119,7 @@ pair<Shape, double> MyAlgo3::calculate_best_shape2(int src, int dst) {
 // state = 1, left limit
 // state = 2, right limit
 // state = 3, left and right limit
-double MyAlgo3::solve_fidelity(int left, int right, int t, int state, vector<int> &path) {
+double MyAlgo3::solve_fidelity(int left, int right, int t, int state, const vector<int> &path) {
     int left_id = path[left], right_id = path[right];
     int left_remain = graph.get_node_memory_at(left_id, t);
     int right_remain = graph.get_node_memory_at(right_id, t);
@@ -164,7 +164,7 @@ double MyAlgo3::solve_fidelity(int left, int right, int t, int state, vector<int
     return dp[left][right][t][state] = best;
 }
 
-double MyAlgo3::solve2(int left, int right, int t, int state, vector<int> &path) {
+double MyAlgo3::solve2(int left, int right, int t, int state, const vector<int> &path) {
     int left_id = path[left], right_id = path[right];
     int left_remain = graph.get_node_memory_at(left_id, t);
     int right_remain = graph.get_node_memory_at(right_id, t);
@@ -213,7 +213,7 @@ double MyAlgo3::solve2(int left, int right, int t, int state, vector<int> &path)
     return dp2[left][right][t][state] = best;
 }
 
-Shape_vector MyAlgo3::backtracing_shape(int left, int right, int t, int state, vector<int> &path) {
+Shape_vector MyAlgo3::backtracing_shape(int left, int right, int t, int state, const vector<int> &path) {
     int k = par[left][right][t][state].first;
     int s = par[left][right][t][state].second;
     int left_id = path[left], right_id = path[right];
@@ -273,7 +273,7 @@ Shape_vector MyAlgo3::backtracing_shape(int left, int right, int t, int state, v
     return result;
 }
 
-Shape_vector MyAlgo3::backtracing_shape2(int left, int right, int t, int state, vector<int> &path) {
+Shape_vector MyAlgo3::backtracing_shape2(int left, int right, int t, int state, const vector<int> &path) {
     int k = par2[left][right][t][state].first;
     int s = par2[left][right][t][state].second;
     int left_id = path[left], right_id = path[right];

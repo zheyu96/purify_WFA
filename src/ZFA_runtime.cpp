@@ -151,7 +151,7 @@ int main() {
 
                 Greedy path_method;
                 path_method.build_paths(graph, requests);
-                map<SDpair, vector<Path>> paths = path_method.get_paths();
+                const auto& paths = path_method.get_paths();
 
                 // 建立演算法，顯式傳入當前實驗的 epsilon
                 AlgorithmBase* algo = new WernerAlgo_time(graph, requests, paths, input_param["epsilon"]);

@@ -23,12 +23,12 @@ protected:
     double t2F(double t);
     double F2t(double F);
     double pass_tao(double F);
-    vector<Path> get_paths(int src, int dst);
+    const vector<Path>& get_paths(int src, int dst);
 public:
     AlgorithmBase(const Graph& graph, const vector<SDpair>& requests, const map<SDpair, vector<Path>>& paths);
-    map<string, double> get_res();
+    const map<string, double>& get_res() const;
     double get_res(string str);
-    vector<double> get_cdf();
+    const vector<double>& get_cdf() const;
     string get_name();
     virtual ~AlgorithmBase();
     virtual void run() = 0;

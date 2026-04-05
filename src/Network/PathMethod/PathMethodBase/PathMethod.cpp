@@ -3,11 +3,11 @@
 PathMethod::PathMethod() {}
 PathMethod::~PathMethod() {}
 
-vector<Path> PathMethod::get_paths(int src, int dst) {
+const vector<Path>& PathMethod::get_paths(int src, int dst) {
     return paths[{src, dst}];
 }
 
-map<SDpair, vector<Path>> PathMethod::get_paths() {
+const map<SDpair, vector<Path>>& PathMethod::get_paths() const {
     return paths;
 }
 

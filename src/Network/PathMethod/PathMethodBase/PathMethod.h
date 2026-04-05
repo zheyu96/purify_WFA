@@ -21,8 +21,8 @@ public:
     PathMethod();
     ~PathMethod();
     string get_name();
-    vector<Path> get_paths(int src, int dst);
-    map<SDpair, vector<Path>> get_paths();
+    const vector<Path>& get_paths(int src, int dst);
+    const map<SDpair, vector<Path>>& get_paths() const;
     virtual void build_paths(Graph _graph, vector<SDpair> _requests) = 0;
 };
 

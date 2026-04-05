@@ -56,12 +56,12 @@ public:
     double get_pure_fidelity();
     double get_F_init(int u, int v);
     double get_delta_P();
-    map<pair<int, int>, double> get_F_init();
+    const map<pair<int, int>, double>& get_F_init() const;
 
     double get_link_werner(int u,int v);
     double get_edge_W(int u,int v);
-    vector<double> get_boundary();
-    vector<double> get_cnt();
+    const vector<double>& get_boundary() const;
+    const vector<double>& get_cnt() const;
 
     // [關鍵修改] 這裡必須宣告帶有 enable_purification 的版本
     bool check_resource(Shape shape, bool threshold = true, bool enable_purification = false);
@@ -73,8 +73,8 @@ public:
     void reserve_shape_ASAP(Shape shape, bool enable_purification = false);
 
     double path_Pr(Path path);
-    double path_Pr(Shape shape);
-    double path_Pr_purify(Shape shape);
+    double path_Pr(const Shape& shape);
+    double path_Pr_purify(const Shape& shape);
     bool check_path_resource(Path path, int amount);
     void reserve_path(Path path);
     void reserve_path(Path path, int amount);

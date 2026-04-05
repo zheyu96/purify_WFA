@@ -34,14 +34,14 @@ string AlgorithmBase::get_name() {
     return algorithm_name;
 }
 
-map<string, double> AlgorithmBase::get_res() {
+const map<string, double>& AlgorithmBase::get_res() const {
     return res;
 }
 
 double AlgorithmBase::get_res(string str) {
     return res[str];
 }
-vector<double> AlgorithmBase::get_cdf() {
+const vector<double>& AlgorithmBase::get_cdf() const {
     return cdf;
 }
 
@@ -70,7 +70,8 @@ void AlgorithmBase::update_res() {
     res["utilization"] = (double)graph.get_usage() / (double)memory_total;
     res["pure_fidelity"] = graph.get_pure_fidelity();
     cdf.clear();
-    vector<double> boundary = graph.get_boundary(), cnt = graph.get_cnt();
+    const vector<double>& boundary = graph.get_boundary();
+    const vector<double>& cnt = graph.get_cnt();
     cdf.resize(boundary.size(), 0);
     double unfinish = request_cnt;
     for(int i = 0; i < (int)boundary.size(); i++) {
@@ -82,6 +83,6 @@ void AlgorithmBase::update_res() {
     }
 }
 
-vector<Path> AlgorithmBase::get_paths(int src, int dst) {
+const vector<Path>& AlgorithmBase::get_paths(int src, int dst) {
     return paths[{src, dst}];
 }

@@ -146,7 +146,7 @@ vector<SDpair> generate_requests_purify_needed(Graph &graph, int requests_cnt, i
     double fid_th = graph.get_fidelity_threshold();
     double A = graph.get_A(), B = graph.get_B();
     double n_param = graph.get_n(), T = graph.get_T(), tao = graph.get_tao();
-    auto F_init = graph.get_F_init();
+    const auto& F_init = graph.get_F_init();
 
     // BFS 找最短路徑
     auto bfs_path = [&](int src, int dst) -> vector<int> {
@@ -643,17 +643,17 @@ int main(){
 
                     new_path_method->build_paths(path_graph, requests);
                     cout << "found path" << endl;
-                    map<SDpair, vector<Path>> paths = new_path_method->get_paths();
+                    const auto& raw_paths = new_path_method->get_paths();
                     map<SDpair, set<Path>> paths_st;
-                    for(auto [sdpair, pathss] : paths) {
-                        for(Path path : pathss) {
+                    for(const auto& [sdpair, pathss] : raw_paths) {
+                        for(const Path& path : pathss) {
                             paths_st[sdpair].insert(path);
                         }
                     }
 
-                    paths.clear();
-                    for(auto [sdpair, pathss] : paths_st) {
-                        for(Path path : pathss) {
+                    map<SDpair, vector<Path>> paths;
+                    for(const auto& [sdpair, pathss] : paths_st) {
+                        for(const Path& path : pathss) {
                             paths[sdpair].push_back(path);
                         }
                     }
@@ -661,10 +661,10 @@ int main(){
                     int path_len = 0, path_cnt = 0, mx_path_len = 0;
 
                     int has_path = 0;
-                    for(SDpair sdpair : requests) {
+                    for(const SDpair& sdpair : requests) {
                         int mi_path_len = INF;
                         has_path += !paths[sdpair].empty();
-                        for(Path path : paths[sdpair]) {
+                        for(const Path& path : paths[sdpair]) {
                             mi_path_len = min(mi_path_len, (int)path.size());
                             for(int i = 1; i < (int)path.size(); i++) {
                                 assert(graph.adj_set[path[i]].count(path[i - 1]));

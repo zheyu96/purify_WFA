@@ -72,7 +72,7 @@ void MyAlgo4::run() {
         int src = requests[i].first;
         int dst = requests[i].second;
         vector<Path> paths = get_paths(src, dst);
-        for(Path path : paths) {
+        for(const Path& path : paths) {
             Shape_vector shape = build_merge_shape(path);
             bool cant = false;
             for(int i = 0; i < (int)shape.size(); i++) {

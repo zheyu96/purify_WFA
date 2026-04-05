@@ -92,15 +92,15 @@ double Graph::get_time_eta(){ return time_eta; }
 double Graph::get_succ_request_cnt() { return succ_request_cnt;}
 int Graph::get_usage() { return usage; }
 
-vector<double> Graph::get_boundary() { return boundary; }
-vector<double> Graph::get_cnt() { return cnt; }
+const vector<double>& Graph::get_boundary() const { return boundary; }
+const vector<double>& Graph::get_cnt() const { return cnt; }
 
 double Graph::get_F_init(int u, int v) {
     assert(adj_set[u].count(v));
     return F_init[{u, v}];
 }
 
-map<pair<int, int>, double> Graph::get_F_init() { return F_init; }
+const map<pair<int, int>, double>& Graph::get_F_init() const { return F_init; }
 
 double Graph::get_link_werner(int u,int v){ //werner state
     auto it=F_init.find({u,v});
@@ -460,17 +460,17 @@ double Graph::path_Pr(Path path) {
     }
     return Pr;
 }
-double Graph::path_Pr(Shape shape) {
+double Graph::path_Pr(const Shape& shape) {
     Path path;
-    for(auto P : shape.get_node_mem_range()) {
+    for(const auto& P : shape.get_node_mem_range()) {
         path.push_back(P.first);
     }
     return path_Pr(path);
 }
 
-double Graph::path_Pr_purify(Shape shape) {
-    Shape_vector nm = shape.get_node_mem_range();
-    vector<int> pr = shape.get_link_purify_rounds();
+double Graph::path_Pr_purify(const Shape& shape) {
+    const Shape_vector& nm = shape.get_node_mem_range();
+    const vector<int>& pr = shape.get_link_purify_rounds();
     double Pr = 1.0;
 
     // 每條 link 的 entanglement + purification 成功機率
